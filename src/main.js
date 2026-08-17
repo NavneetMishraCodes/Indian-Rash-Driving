@@ -12,25 +12,21 @@ const speedLabel = document.querySelector("#speed");
 // ============================================================
 
 const COLLISION_SOUNDS = [
-  "./audio/collisions/atmkbfjg-echo.mp3",
-  "./audio/collisions/cid-acp-behn-choo.mp3",
-  "./audio/collisions/cid-chut.mp3",
-  "./audio/collisions/cid-le-mdc.mp3",
-  "./audio/collisions/cid-tum-bkl-f.mp3",
-  "./audio/collisions/cid.mp3",
-  "./audio/collisions/dil-na-diya.mp3",
-  "./audio/collisions/kyu-re-madarchod-cid.mp3"
+  "/audio/collisions/atmkbfjg-echo.mp3",
+  "/audio/collisions/cid-acp-behn-choo.mp3",
+  "/audio/collisions/cid-chut.mp3",
+  "/audio/collisions/cid-le-mdc.mp3",
+  "/audio/collisions/cid-tum-bkl-f.mp3",
+  "/audio/collisions/cid.mp3",
+  "/audio/collisions/dil-na-diya.mp3",
+  "/audio/collisions/kyu-re-madarchod-cid.mp3"
 ];
 
 let currentCollisionAudio = null;
 
 function playRandomCollisionSound() {
-  if (COLLISION_SOUNDS.length === 0) {
-    console.warn("No collision sounds configured.");
-    return;
-  }
+  if (!COLLISION_SOUNDS.length) return;
 
-  // Stop the previous collision sound.
   if (currentCollisionAudio) {
     currentCollisionAudio.pause();
     currentCollisionAudio.currentTime = 0;
@@ -41,23 +37,16 @@ function playRandomCollisionSound() {
       Math.floor(Math.random() * COLLISION_SOUNDS.length)
     ];
 
-  console.log("Playing collision sound:", path);
-
   const audio = new Audio(path);
 
-  audio.volume = 1.0;
+  audio.volume = 1;
   audio.loop = false;
-  audio.currentTime = 0;
 
   currentCollisionAudio = audio;
 
-  audio.play()
-    .then(() => {
-      console.log("Collision sound started successfully.");
-    })
-    .catch((error) => {
-      console.error("Collision sound failed:", error);
-    });
+  audio.play().catch(error => {
+    console.error("Collision sound failed:", error);
+  });
 }
 
 const TAU = Math.PI * 2;

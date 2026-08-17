@@ -22,8 +22,9 @@ const state = {
   lateral: 0,
   forwardSpeed: 0,
   distance: 0,
+  roadOffset: 0,
   time: 0
-}
+};
 
 const road = {
   laneCount: 4,
@@ -157,6 +158,8 @@ function update(dt) {
   player.bob += dt * (5 + state.forwardSpeed * 20);
 
   state.distance += state.forwardSpeed * dt;
+
+  state.roadOffset = (state.roadOffset + state.forwardSpeed * dt * 0.95) % 1;
 
   player.update(dt, keys, state);
 
@@ -309,29 +312,72 @@ function drawLaneMarker(fraction) {
   const w = innerWidth;
   const h = innerHeight;
 
-  // Dashed lines get longer and thicker toward the player,
-  // matching the perspective of the road.
-  const dashCount = 30;
+  // Number of repeating dash segments.
+  const segments = 18;
 
-  for (let i = 0; i < dashCount; i++) {
-    const d0 = i / dashCount;
-    const d1 = Math.min(1, d0 + 0.42 / dashCount);
+  // Each segment contains a dash and a gap.
+  const cycle = 1 / segments;
 
-    // Keep a small gap between dashes.
-    if (i % 2 === 1) continue;
+  // Dash occupies 45% of each cycle.
+  const dashLength = cycle * 0.45;
 
-    const a = roadPoint(fraction, d0, w, h);
-    const b = roadPoint(fraction, d1, w, h);
+  for (let i = 0; i < segments; i++) {
+    // Continuous depth position.
+    let d0 =
+      i * cycle + state.roadOffset;
 
-    const thickness = lerp(1.1, 4.2, Math.pow(d0, 1.35));
+    // Wrap smoothly.
+    d0 %= 1;
 
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = "#e7e3ce";
-    ctx.lineWidth = Math.max(1, w * 0.00085 * thickness);
-    ctx.lineCap = "butt";
-    ctx.stroke();
+    const d1 = Math.min(
+      d0 + dashLength,
+      1
+    );
+
+    // If the dash wrapped around the horizon,
+    // skip it for this frame.
+    if (d0 >= 0 && d0 < 1 && d1 > d0) {
+
+      const a = roadPoint(
+        fraction,
+        d0,
+        w,
+        h
+      );
+
+      const b = roadPoint(
+        fraction,
+        d1,
+        w,
+        h
+      );
+
+      // Perspective thickness.
+      const perspectiveAmount =
+        Math.pow(d0, 1.4);
+
+      ctx.beginPath();
+
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+
+      ctx.strokeStyle = "#e7e3ce";
+
+      ctx.lineWidth =
+        Math.max(
+          1,
+          w *
+          lerp(
+            0.0007,
+            0.0035,
+            perspectiveAmount
+          )
+        );
+
+      ctx.lineCap = "butt";
+
+      ctx.stroke();
+    }
   }
 }
 

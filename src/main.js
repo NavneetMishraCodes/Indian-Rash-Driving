@@ -12,14 +12,13 @@ const speedLabel = document.querySelector("#speed");
 // ============================================================
 
 const COLLISION_SOUNDS = [
-  "/audio/collisions/atmkbfjg-echo.mp3",
-  "/audio/collisions/cid-acp-behn-choo.mp3",
-  "/audio/collisions/cid-chut.mp3",
-  "/audio/collisions/cid-le-mdc.mp3",
-  "/audio/collisions/cid-tum-bkl-f.mp3",
-  "/audio/collisions/cid.mp3",
-  "/audio/collisions/dil-na-diya.mp3",
-  "/audio/collisions/kyu-re-madarchod-cid.mp3"
+  `${import.meta.env.BASE_URL}audio/collisions/cid.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/cid-chut.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/kyu-re-madarchod-cid.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/atmkbfjg-echo.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/dil-na-diya.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/cid-acp-behn-choo.mp3`,
+  `${import.meta.env.BASE_URL}audio/collisions/cid-le-mdc.mp3`,
 ];
 
 let currentCollisionAudio = null;

@@ -8,6 +8,17 @@ export class TrafficCar {
 
     this.width = 0.052;
     this.height = 0.115;
+
+    this.hit = false;
+    this.hitX = 0;
+    this.hitY = 0;
+    this.hitRotation = 0;
+
+    this.hitVelocityX = 0;
+    this.hitVelocityY = 0;
+    this.hitVelocityDepth = 0;
+
+    this.hitSpin = 0;
   }
 
   reset(lane, depth, speed, type) {
@@ -15,12 +26,69 @@ export class TrafficCar {
     this.depth = depth;
     this.speed = speed;
     this.type = type;
+
+    this.hit = false;
+    this.hitX = 0;
+    this.hitY = 0;
+    this.hitRotation = 0;
+
+    this.hitVelocityX = 0;
+    this.hitVelocityY = 0;
+    this.hitVelocityDepth = 0;
+
+    this.hitSpin = 0;
   }
 
   update(dt, playerSpeed) {
-    // Oncoming cars move toward the player.
-    this.depth +=
-      (playerSpeed + this.speed) * dt;
+    // Normal traffic movement.
+    if (!this.hit) {
+      this.depth +=
+        (playerSpeed + this.speed) * dt;
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // HIT PHYSICS
+    // ----------------------------------------------------------
+
+    this.hitX += this.hitVelocityX * dt;
+    this.hitY += this.hitVelocityY * dt;
+    this.depth += this.hitVelocityDepth * dt;
+
+    // Gravity-like pull.
+    this.hitVelocityY += 1.8 * dt;
+
+    // Air resistance.
+    this.hitVelocityX *= Math.pow(0.985, dt * 60);
+    this.hitVelocityY *= Math.pow(0.985, dt * 60);
+    this.hitVelocityDepth *= Math.pow(0.985, dt * 60);
+
+    // Spin.
+    this.hitRotation += this.hitSpin * dt;
+  }
+
+  launch(direction = 1) {
+    this.hit = true;
+
+    // Strong sideways launch.
+    this.hitVelocityX =
+      direction * (0.45 + Math.random() * 0.35);
+
+    // Throw the car upward.
+    this.hitVelocityY =
+      -(0.65 + Math.random() * 0.30);
+
+    // Push it forward away from the player.
+    this.hitVelocityDepth =
+      0.20 + Math.random() * 0.20;
+
+    // Random spin direction and strength.
+    this.hitSpin =
+      (Math.random() < 0.5 ? -1 : 1) *
+      (3.5 + Math.random() * 5);
+
+    this.hitRotation = 0;
   }
 
   draw(ctx, x, y, scale) {
@@ -32,8 +100,14 @@ export class TrafficCar {
 
     ctx.save();
 
-    ctx.translate(x, y);
-    ctx.rotate(Math.PI);
+    ctx.translate(
+      x + this.hitX * ctx.canvas.width,
+      y + this.hitY * ctx.canvas.height
+    );
+
+    ctx.rotate(
+      Math.PI + this.hitRotation
+    );
 
     // Shadow
     ctx.fillStyle = "rgba(0,0,0,0.20)";

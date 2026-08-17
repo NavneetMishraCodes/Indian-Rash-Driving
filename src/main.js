@@ -5,6 +5,61 @@ const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false });
 const speedLabel = document.querySelector("#speed");
 
+// ============================================================
+// COLLISION SOUND EFFECTS
+// Add/remove sound files from this list whenever you want.
+// Files should be placed in: src/audio/collisions/
+// ============================================================
+
+const COLLISION_SOUNDS = [
+  "./audio/collisions/atmkbfjg-echo.mp3",
+  "./audio/collisions/cid-acp-behn-choo.mp3",
+  "./audio/collisions/cid-chut.mp3",
+  "./audio/collisions/cid-le-mdc.mp3",
+  "./audio/collisions/cid-tum-bkl-f.mp3",
+  "./audio/collisions/cid.mp3",
+  "./audio/collisions/dil-na-diya.mp3",
+  "./audio/collisions/kyu-re-madarchod-cid.mp3"
+];
+
+let currentCollisionAudio = null;
+
+function playRandomCollisionSound() {
+  if (COLLISION_SOUNDS.length === 0) {
+    console.warn("No collision sounds configured.");
+    return;
+  }
+
+  // Stop the previous collision sound.
+  if (currentCollisionAudio) {
+    currentCollisionAudio.pause();
+    currentCollisionAudio.currentTime = 0;
+  }
+
+  const path =
+    COLLISION_SOUNDS[
+      Math.floor(Math.random() * COLLISION_SOUNDS.length)
+    ];
+
+  console.log("Playing collision sound:", path);
+
+  const audio = new Audio(path);
+
+  audio.volume = 1.0;
+  audio.loop = false;
+  audio.currentTime = 0;
+
+  currentCollisionAudio = audio;
+
+  audio.play()
+    .then(() => {
+      console.log("Collision sound started successfully.");
+    })
+    .catch((error) => {
+      console.error("Collision sound failed:", error);
+    });
+}
+
 const TAU = Math.PI * 2;
 const keys = new Set();
 
@@ -112,6 +167,39 @@ function laneWorldX(lane) {
   return ((lane + 0.5) / road.laneCount - 0.5) * road.worldWidth / road.worldWidth;
 }
 
+function checkTrafficCollisions() {
+  for (const car of traffic.cars) {
+    // Already launched cars cannot collide again.
+    if (car.hit) continue;
+
+    // Traffic must be close to the player.
+    const depthDifference =
+      Math.abs(car.depth - 0.98);
+
+    if (depthDifference > 0.075) {
+      continue;
+    }
+
+    // Check lane overlap.
+    const laneDifference =
+      Math.abs(car.lane - state.lane);
+
+    if (laneDifference > 0.42) {
+      continue;
+    }
+
+    // Collision!
+    const launchDirection =
+      car.lane < state.lane ? -1 : 1;
+
+    car.launch(launchDirection);
+
+    playRandomCollisionSound();
+
+    break;
+  }
+}
+
 function update(dt) {
   state.time += dt;
 
@@ -168,6 +256,8 @@ function update(dt) {
 
   player.update(dt, keys, state);
   traffic.update(dt, state.forwardSpeed);
+
+  checkTrafficCollisions();
 
   // Move scenery toward camera and recycle it.
   for (const obj of scenery) {

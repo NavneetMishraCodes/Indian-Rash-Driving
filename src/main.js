@@ -15,13 +15,13 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
 const state = {
-  lane: 1.5,
-  laneTarget: 1.5,
+  lane: 1,
+  laneTarget: 1,
   lateral: 0,
   forwardSpeed: 0,
   distance: 0,
   time: 0
-};
+}
 
 const road = {
   laneCount: 4,

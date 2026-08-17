@@ -218,6 +218,8 @@ function drawGrass(w, h) {
 function drawRoad(w, h) {
   const topY = h * road.horizonY;
   const bottomY = h * road.bottomY;
+
+  // Road edges use the exact same perspective geometry as the lane markers.
   const topHalf = w * road.farHalfWidth;
   const bottomHalf = w * road.nearHalfWidth;
 
@@ -228,33 +230,89 @@ function drawRoad(w, h) {
   ctx.lineTo(w / 2 + bottomHalf * 1.18, bottomY);
   ctx.lineTo(w / 2 - bottomHalf * 1.18, bottomY);
   ctx.closePath();
-  ctx.fillStyle = "#c9b47b";
+  ctx.fillStyle = "#c8b477";
   ctx.fill();
 
-  // Asphalt.
+  // Main asphalt.
   ctx.beginPath();
   ctx.moveTo(w / 2 - topHalf, topY);
   ctx.lineTo(w / 2 + topHalf, topY);
   ctx.lineTo(w / 2 + bottomHalf, bottomY);
   ctx.lineTo(w / 2 - bottomHalf, bottomY);
   ctx.closePath();
-  ctx.fillStyle = "#45484b";
+  ctx.fillStyle = "#44474a";
   ctx.fill();
 
-  // Road edge lines.
-  drawPerspectiveLine(-1, "#e6dfb7", 0.012);
-  drawPerspectiveLine(1, "#e6dfb7", 0.012);
+  // Road edge markings.
+  drawRoadBoundary(-1, "#f0e8bd");
+  drawRoadBoundary(1, "#f0e8bd");
 
-  // Four lanes -> 3 dashed separators.
+  // Exactly three lane separators for exactly four lanes.
+  // Each separator is calculated from the road width at that depth.
   for (let lane = 1; lane < road.laneCount; lane++) {
-    const xWorld = ((lane / road.laneCount) - 0.5) * road.worldWidth / road.worldWidth;
-    drawDashedPerspectiveLine(xWorld, "#ddd9c5");
+    const fraction = lane / road.laneCount;
+    drawLaneMarker(fraction);
   }
 
-  // Subtle road center shimmer.
-  ctx.globalAlpha = 0.08;
-  drawPerspectiveLine(0, "#ffffff", 0.006);
+  // Very subtle asphalt highlight.
+  ctx.globalAlpha = 0.055;
+  drawRoadBoundary(0, "#ffffff");
   ctx.globalAlpha = 1;
+}
+
+function roadPoint(fraction, depth, w, h) {
+  const p = perspective(depth);
+  // fraction 0 = left road edge, 0.5 = center, 1 = right road edge.
+  const world = (fraction - 0.5) * 2;
+  return {
+    x: w * (0.5 + world * p.width),
+    y: h * p.y
+  };
+}
+
+function drawRoadBoundary(side, color) {
+  const w = innerWidth;
+  const h = innerHeight;
+  const fraction = side < 0 ? 0 : side > 0 ? 1 : 0.5;
+  const a = roadPoint(fraction, 0, w, h);
+  const b = roadPoint(fraction, 1, w, h);
+
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.2, w * 0.0045);
+  ctx.stroke();
+}
+
+function drawLaneMarker(fraction) {
+  const w = innerWidth;
+  const h = innerHeight;
+
+  // Dashed lines get longer and thicker toward the player,
+  // matching the perspective of the road.
+  const dashCount = 30;
+
+  for (let i = 0; i < dashCount; i++) {
+    const d0 = i / dashCount;
+    const d1 = Math.min(1, d0 + 0.42 / dashCount);
+
+    // Keep a small gap between dashes.
+    if (i % 2 === 1) continue;
+
+    const a = roadPoint(fraction, d0, w, h);
+    const b = roadPoint(fraction, d1, w, h);
+
+    const thickness = lerp(1.1, 4.2, Math.pow(d0, 1.35));
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = "#e7e3ce";
+    ctx.lineWidth = Math.max(1, w * 0.00085 * thickness);
+    ctx.lineCap = "butt";
+    ctx.stroke();
+  }
 }
 
 function drawPerspectiveLine(worldX, color, widthRatio) {

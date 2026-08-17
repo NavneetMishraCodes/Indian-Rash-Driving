@@ -43,7 +43,7 @@ const player = {
 };
 
 const scenery = [];
-const SCENERY_COUNT = 46;
+const SCENERY_COUNT = 90;
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -62,12 +62,22 @@ function rand(min, max) {
 
 function makeScenery() {
   scenery.length = 0;
+
+  const types = [
+    "house",
+    "house",
+    "park",
+    "park",
+    "wall",
+    "wall"
+  ];
+
   for (let i = 0; i < SCENERY_COUNT; i++) {
     scenery.push({
       side: Math.random() < 0.5 ? -1 : 1,
       depth: Math.random(),
-      offset: rand(1.0, 2.7),
-      kind: Math.random() < 0.72 ? "tree" : "bush",
+      offset: rand(1.45, 2.45),
+      kind: types[Math.floor(Math.random() * types.length)],
       phase: Math.random() * TAU
     });
   }
@@ -158,9 +168,22 @@ function update(dt) {
     obj.depth += state.forwardSpeed * dt * 0.72;
     if (obj.depth > 1.08) {
       obj.depth -= 1.08;
+
       obj.side = Math.random() < 0.5 ? -1 : 1;
-      obj.offset = rand(1.0, 2.7);
-      obj.kind = Math.random() < 0.72 ? "tree" : "bush";
+
+      // Keep every object safely away from the road.
+      obj.offset = rand(1.45, 2.45);
+
+      // Natural mixture of roadside objects.
+      const types = [
+        "house",
+        "house",
+        "park",
+        "park",
+        "wall"
+      ];
+
+      obj.kind = types[Math.floor(Math.random() * types.length)];
       obj.phase = Math.random() * TAU;
     }
   }
@@ -352,20 +375,220 @@ function drawDashedPerspectiveLine(worldX, color) {
 }
 
 function drawScenery(w, h) {
-  // Far objects first, near objects last.
   const sorted = [...scenery].sort((a, b) => a.depth - b.depth);
 
   for (const obj of sorted) {
     const p = perspective(obj.depth);
+
     const x = w * (0.5 + obj.side * p.width * obj.offset);
     const y = h * p.y;
-    const scale = lerp(0.18, 1.35, Math.pow(obj.depth, 1.3));
 
-    if (obj.kind === "tree") {
-      drawTree(x, y, scale);
-    } else {
-      drawBush(x, y, scale);
+    const scale = lerp(
+      0.18,
+      1.15,
+      Math.pow(obj.depth, 1.3)
+    );
+
+    if (obj.kind === "house") {
+      drawHouse(x, y, scale, obj.side);
     }
+
+    if (obj.kind === "park") {
+      drawPark(x, y, scale);
+    }
+
+    if (obj.kind === "wall") {
+      drawWall(x, y, scale, obj.side);
+    }
+  }
+}
+
+function drawHouse(x, y, s, side) {
+  const width = 55 * s;
+  const height = 45 * s;
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y + 4 * s,
+    width * 0.65,
+    8 * s,
+    0,
+    0,
+    TAU
+  );
+  ctx.fill();
+
+  // Building
+  ctx.fillStyle = "#d9c09b";
+  ctx.fillRect(
+    x - width / 2,
+    y - height,
+    width,
+    height
+  );
+
+  // Roof
+  ctx.fillStyle = "#9a4f3f";
+
+  ctx.beginPath();
+  ctx.moveTo(
+    x - width * 0.62,
+    y - height
+  );
+
+  ctx.lineTo(
+    x,
+    y - height - 25 * s
+  );
+
+  ctx.lineTo(
+    x + width * 0.62,
+    y - height
+  );
+
+  ctx.closePath();
+  ctx.fill();
+
+  // Door
+  ctx.fillStyle = "#654534";
+  ctx.fillRect(
+    x - 6 * s,
+    y - 25 * s,
+    12 * s,
+    25 * s
+  );
+
+  // Windows
+  ctx.fillStyle = "#86b8c7";
+
+  ctx.fillRect(
+    x - width * 0.32,
+    y - height * 0.72,
+    13 * s,
+    12 * s
+  );
+
+  ctx.fillRect(
+    x + width * 0.08,
+    y - height * 0.72,
+    13 * s,
+    12 * s
+  );
+}
+
+
+function drawPark(x, y, s) {
+  const width = 75 * s;
+
+  // Ground
+  ctx.fillStyle = "#648f4d";
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y,
+    width,
+    22 * s,
+    0,
+    0,
+    TAU
+  );
+  ctx.fill();
+
+  // Path
+  ctx.fillStyle = "#c8b58b";
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y,
+    width * 0.7,
+    6 * s,
+    0,
+    0,
+    TAU
+  );
+  ctx.fill();
+
+  // Small trees inside park
+  drawMiniTree(
+    x - 28 * s,
+    y - 8 * s,
+    s
+  );
+
+  drawMiniTree(
+    x + 25 * s,
+    y - 5 * s,
+    s
+  );
+}
+
+
+function drawMiniTree(x, y, s) {
+  ctx.fillStyle = "#6d4c35";
+  ctx.fillRect(
+    x - 3 * s,
+    y - 22 * s,
+    6 * s,
+    22 * s
+  );
+
+  ctx.fillStyle = "#477844";
+
+  ctx.beginPath();
+  ctx.arc(
+    x,
+    y - 27 * s,
+    15 * s,
+    0,
+    TAU
+  );
+
+  ctx.fill();
+}
+
+
+function drawWall(x, y, s, side) {
+  const width = 90 * s;
+  const height = 14 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.12)";
+  ctx.fillRect(
+    x - width / 2,
+    y + 2 * s,
+    width,
+    5 * s
+  );
+
+  ctx.fillStyle = "#b8b0a0";
+
+  ctx.fillRect(
+    x - width / 2,
+    y - height,
+    width,
+    height
+  );
+
+  // Wall segments
+  ctx.strokeStyle = "#8d877b";
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x + i * 13 * s,
+      y - height
+    );
+
+    ctx.lineTo(
+      x + i * 13 * s,
+      y
+    );
+
+    ctx.stroke();
   }
 }
 

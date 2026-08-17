@@ -1,4 +1,5 @@
 import { PlayerCar } from "./entities/PlayerCar.js";
+import { TrafficSystem } from "./systems/TrafficSystem.js";
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -37,6 +38,10 @@ const road = {
 };
 
 const player = new PlayerCar();
+
+const traffic = new TrafficSystem();
+
+traffic.start();
 
 const scenery = [];
 const SCENERY_COUNT = 90;
@@ -162,6 +167,7 @@ function update(dt) {
   state.roadOffset = (state.roadOffset + state.forwardSpeed * dt * 0.95) % 1;
 
   player.update(dt, keys, state);
+  traffic.update(dt, state.forwardSpeed);
 
   // Move scenery toward camera and recycle it.
   for (const obj of scenery) {
@@ -207,6 +213,12 @@ function draw() {
   drawGrass(w, h);
   drawRoad(w, h);
   drawScenery(w, h);
+  traffic.draw(
+    ctx,
+    road,
+    roadPoint,
+    perspective
+  );
   drawPlayer(w, h);
 }
 

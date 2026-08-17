@@ -8,17 +8,30 @@ const speedLabel = document.querySelector("#speed");
 // ============================================================
 // COLLISION SOUND EFFECTS
 // Add/remove sound files from this list whenever you want.
-// Files should be placed in: src/audio/collisions/
+// Files should be placed in: public/audio/collisions/
 // ============================================================
 
+// Audio files live in public/audio/collisions/ in the repo.
+// When Vite processes this module, BASE_URL is injected and the
+// public/ directory is served/copied to the root, so sounds are
+// at audio/collisions/....
+// When the raw source is served without Vite (e.g. GitHub Pages
+// serving the repo root directly), import.meta.env is undefined,
+// so we fall back to public/audio/collisions/ to match the repo
+// layout. This keeps the game working in both cases.
+const AUDIO_BASE =
+  import.meta.env && typeof import.meta.env.BASE_URL === "string"
+    ? `${import.meta.env.BASE_URL}audio/collisions/`
+    : "public/audio/collisions/";
+
 const COLLISION_SOUNDS = [
-  `${import.meta.env.BASE_URL}audio/collisions/cid.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/cid-chut.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/kyu-re-madarchod-cid.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/atmkbfjg-echo.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/dil-na-diya.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/cid-acp-behn-choo.mp3`,
-  `${import.meta.env.BASE_URL}audio/collisions/cid-le-mdc.mp3`,
+  `${AUDIO_BASE}cid.mp3`,
+  `${AUDIO_BASE}cid-chut.mp3`,
+  `${AUDIO_BASE}kyu-re-madarchod-cid.mp3`,
+  `${AUDIO_BASE}atmkbfjg-echo.mp3`,
+  `${AUDIO_BASE}dil-na-diya.mp3`,
+  `${AUDIO_BASE}cid-acp-behn-choo.mp3`,
+  `${AUDIO_BASE}cid-le-mdc.mp3`,
 ];
 
 let currentCollisionAudio = null;

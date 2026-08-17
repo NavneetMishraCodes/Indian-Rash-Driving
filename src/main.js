@@ -1,3 +1,5 @@
+import { PlayerCar } from "./entities/PlayerCar.js";
+
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false });
 const speedLabel = document.querySelector("#speed");
@@ -33,14 +35,7 @@ const road = {
   farHalfWidth: 0.055
 };
 
-const player = {
-  x: 0,
-  y: 0.88,
-  width: 0.105,
-  height: 0.18,
-  lean: 0,
-  bob: 0
-};
+const player = new PlayerCar();
 
 const scenery = [];
 const SCENERY_COUNT = 90;
@@ -120,7 +115,7 @@ function update(dt) {
 
   const maxSpeed = 0.34;
   const acceleration = 0.22;
-  const deceleration = 0.32;
+  const deceleration = 0.25;
 
   if (accelerating) {
     state.forwardSpeed = Math.min(maxSpeed, state.forwardSpeed + acceleration * dt);
@@ -162,6 +157,8 @@ function update(dt) {
   player.bob += dt * (5 + state.forwardSpeed * 20);
 
   state.distance += state.forwardSpeed * dt;
+
+  player.update(dt, keys, state);
 
   // Move scenery toward camera and recycle it.
   for (const obj of scenery) {
@@ -632,56 +629,23 @@ function drawBush(x, y, s) {
 }
 
 function drawPlayer(w, h) {
-  const laneNorm = ((state.lane + 0.5) / road.laneCount - 0.5);
-  const roadHalfAtPlayer = perspective(0.98).width;
-  const x = w * (0.5 + laneNorm * roadHalfAtPlayer * 1.85);
-  const y = h * player.y + Math.sin(player.bob) * 1.2;
+  const laneNorm =
+    ((state.lane + 0.5) / road.laneCount - 0.5);
 
-  // Shadow.
-  ctx.save();
-  ctx.translate(x, y + 11);
-  ctx.rotate(player.lean);
-  ctx.fillStyle = "rgba(0,0,0,.28)";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, w * 0.045, h * 0.018, 0, 0, TAU);
-  ctx.fill();
-  ctx.restore();
+  const roadHalfAtPlayer =
+    perspective(0.98).width;
 
-  // Stylized car body.
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(player.lean);
+  const x =
+    w * (
+      0.5 +
+      laneNorm * roadHalfAtPlayer * 1.85
+    );
 
-  const cw = w * 0.055;
-  const ch = h * 0.13;
+  const y =
+    h * 0.88 +
+    Math.sin(player.bob) * 1.2;
 
-  // Wheels.
-  ctx.fillStyle = "#17191a";
-  ctx.fillRect(-cw * .56, -ch * .28, cw * .16, ch * .35);
-  ctx.fillRect(cw * .40, -ch * .28, cw * .16, ch * .35);
-  ctx.fillRect(-cw * .56, ch * .18, cw * .16, ch * .35);
-  ctx.fillRect(cw * .40, ch * .18, cw * .16, ch * .35);
-
-  // Body.
-  ctx.fillStyle = "#d63f35";
-  roundRect(-cw / 2, -ch / 2, cw, ch, cw * .22);
-  ctx.fill();
-
-  // Roof / windshield.
-  ctx.fillStyle = "#253746";
-  roundRect(-cw * .33, -ch * .20, cw * .66, ch * .43, cw * .12);
-  ctx.fill();
-
-  // Rear glass highlight.
-  ctx.fillStyle = "rgba(255,255,255,.18)";
-  ctx.fillRect(-cw * .25, ch * .03, cw * .50, ch * .035);
-
-  // Tail lights.
-  ctx.fillStyle = "#ff6b5f";
-  ctx.fillRect(-cw * .38, ch * .35, cw * .18, ch * .055);
-  ctx.fillRect(cw * .20, ch * .35, cw * .18, ch * .055);
-
-  ctx.restore();
+  player.draw(ctx, x, y, 1);
 }
 
 function roundRect(x, y, width, height, radius) {

@@ -3,17 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Indian Rash Driving</title>
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-FDV0L82NVT');
+  </script>
+
   <link rel="stylesheet" href="src/style.css">
 </head>
+
 <body>
   <main id="game-wrap">
     <canvas id="game" aria-label="Indian Rash Driving game"></canvas>
+
     <div id="hud">
       <span>WASD</span>
       <span id="speed">0 km/h</span>
     </div>
   </main>
+
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

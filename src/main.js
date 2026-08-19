@@ -69,13 +69,55 @@ const touchInput = {
   left: false,
   right: false
 };
+const activePointerActions = new Map();
 
-function resetInputState() {
-  keys.clear();
+function syncTouchInput() {
   touchInput.accelerate = false;
   touchInput.brake = false;
   touchInput.left = false;
   touchInput.right = false;
+
+  for (const action of activePointerActions.values()) {
+    touchInput[action] = true;
+  }
+}
+
+function resetInputState() {
+  keys.clear();
+  activePointerActions.clear();
+  syncTouchInput();
+}
+
+function getPointerAction(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+
+  if (
+    x < 0 || x > rect.width ||
+    y < rect.height * 0.62 || y > rect.height
+  ) {
+    return null;
+  }
+
+  // The lower control band is split into left, right, accelerate, and brake.
+  const actions = ["left", "right", "accelerate", "brake"];
+  const column = Math.min(
+    actions.length - 1,
+    Math.floor((x / rect.width) * actions.length)
+  );
+
+  return actions[column];
+}
+
+function clearPointerAction(pointerId) {
+  if (!activePointerActions.delete(pointerId)) return;
+
+  if (canvas.hasPointerCapture(pointerId)) {
+    canvas.releasePointerCapture(pointerId);
+  }
+
+  syncTouchInput();
 }
 
 window.addEventListener("keydown", (e) => {
@@ -87,6 +129,33 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 window.addEventListener("blur", resetInputState);
+
+canvas.addEventListener("pointerdown", (event) => {
+  const action = getPointerAction(event);
+
+  if (!action) return;
+
+  event.preventDefault();
+  canvas.setPointerCapture(event.pointerId);
+  activePointerActions.set(event.pointerId, action);
+  syncTouchInput();
+}, { passive: false });
+
+canvas.addEventListener("pointerup", (event) => {
+  clearPointerAction(event.pointerId);
+});
+
+canvas.addEventListener("pointercancel", (event) => {
+  clearPointerAction(event.pointerId);
+});
+
+canvas.addEventListener("pointerleave", (event) => {
+  clearPointerAction(event.pointerId);
+});
+
+canvas.addEventListener("lostpointercapture", (event) => {
+  clearPointerAction(event.pointerId);
+});
 
 const state = {
   lane: 1,

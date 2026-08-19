@@ -25,8 +25,8 @@ export class PlayerCar {
   }
 
   draw(ctx, x, y, scale = 1) {
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
     const carW = w * this.width * scale;
     const carH = h * this.height * scale;

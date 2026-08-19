@@ -146,8 +146,8 @@ export class TrafficSystem {
 
   draw(ctx, road, roadPoint, perspective) {
 
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
     // Far cars first.
     const sorted =

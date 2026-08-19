@@ -92,8 +92,8 @@ export class TrafficCar {
   }
 
   draw(ctx, x, y, scale) {
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
     const carW = w * this.width * scale;
     const carH = h * this.height * scale;
@@ -101,8 +101,8 @@ export class TrafficCar {
     ctx.save();
 
     ctx.translate(
-      x + this.hitX * ctx.canvas.width,
-      y + this.hitY * ctx.canvas.height
+      x + this.hitX * window.innerWidth,
+      y + this.hitY * window.innerHeight
     );
 
     ctx.rotate(

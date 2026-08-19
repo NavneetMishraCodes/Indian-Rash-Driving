@@ -10,6 +10,8 @@ export class TrafficCar {
     this.height = 0.115;
 
     this.hit = false;
+    this.hitAge = 0;
+    this.hitLifetime = 1.5;
     this.hitX = 0;
     this.hitY = 0;
     this.hitRotation = 0;
@@ -28,6 +30,7 @@ export class TrafficCar {
     this.type = type;
 
     this.hit = false;
+    this.hitAge = 0;
     this.hitX = 0;
     this.hitY = 0;
     this.hitRotation = 0;
@@ -52,6 +55,7 @@ export class TrafficCar {
     // HIT PHYSICS
     // ----------------------------------------------------------
 
+    this.hitAge += dt;
     this.hitX += this.hitVelocityX * dt;
     this.hitY += this.hitVelocityY * dt;
     this.depth += this.hitVelocityDepth * dt;
@@ -70,6 +74,7 @@ export class TrafficCar {
 
   launch(direction = 1) {
     this.hit = true;
+    this.hitAge = 0;
 
     // Strong sideways launch.
     this.hitVelocityX =

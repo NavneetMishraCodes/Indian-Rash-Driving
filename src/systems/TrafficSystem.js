@@ -116,13 +116,19 @@ export class TrafficSystem {
         );
     }
 
-    // Remove cars that passed the player.
+    // Remove cars that passed the player or finished their hit animation.
     for (
         let i = this.cars.length - 1;
         i >= 0;
         i--
     ) {
-        if (this.cars[i].depth > 1.15) {
+        if (
+          this.cars[i].depth > 1.15 ||
+          (
+            this.cars[i].hit &&
+            this.cars[i].hitAge >= this.cars[i].hitLifetime
+          )
+        ) {
         this.cars.splice(i, 1);
         }
     }

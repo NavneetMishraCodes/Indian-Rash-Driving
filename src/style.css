@@ -52,6 +52,12 @@ canvas {
   backdrop-filter: blur(5px);
 }
 
+@media (pointer: coarse) {
+  #hud span:first-child {
+    display: none;
+  }
+}
+
 @media (max-width: 768px), (pointer: coarse) {
   #touch-controls {
     position: absolute;

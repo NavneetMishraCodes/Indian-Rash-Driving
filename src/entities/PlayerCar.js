@@ -9,10 +9,8 @@ export class PlayerCar {
     this.boosting = false;
   }
 
-  update(dt, keys, state) {
-    this.boosting =
-      keys.has("KeyW") ||
-      keys.has("ArrowUp");
+  update(dt, input, state) {
+    this.boosting = input.accelerate;
 
     this.bob += dt * (5 + state.forwardSpeed * 20);
 

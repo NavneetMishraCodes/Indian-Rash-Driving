@@ -63,6 +63,20 @@ function playRandomCollisionSound() {
 
 const TAU = Math.PI * 2;
 const keys = new Set();
+const touchInput = {
+  accelerate: false,
+  brake: false,
+  left: false,
+  right: false
+};
+
+function resetInputState() {
+  keys.clear();
+  touchInput.accelerate = false;
+  touchInput.brake = false;
+  touchInput.left = false;
+  touchInput.right = false;
+}
 
 window.addEventListener("keydown", (e) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"].includes(e.code)) {
@@ -72,6 +86,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keyup", (e) => keys.delete(e.code));
+window.addEventListener("blur", resetInputState);
 
 const state = {
   lane: 1,
@@ -204,26 +219,42 @@ function checkTrafficCollisions() {
 function update(dt) {
   state.time += dt;
 
-  // W accelerates toward cruise speed; S slows down.
-  const accelerating = keys.has("KeyW") || keys.has("ArrowUp");
-  const braking = keys.has("KeyS") || keys.has("ArrowDown");
+  const input = {
+    accelerate:
+      keys.has("KeyW") ||
+      keys.has("ArrowUp") ||
+      touchInput.accelerate,
+    brake:
+      keys.has("KeyS") ||
+      keys.has("ArrowDown") ||
+      touchInput.brake,
+    left:
+      keys.has("KeyA") ||
+      keys.has("ArrowLeft") ||
+      touchInput.left,
+    right:
+      keys.has("KeyD") ||
+      keys.has("ArrowRight") ||
+      touchInput.right
+  };
 
+  // W accelerates toward cruise speed; S slows down.
   const maxSpeed = 0.34;
   const acceleration = 0.22;
   const deceleration = 0.25;
 
-  if (accelerating) {
+  if (input.accelerate) {
     state.forwardSpeed = Math.min(maxSpeed, state.forwardSpeed + acceleration * dt);
   } else {
     state.forwardSpeed = Math.max(0.08, state.forwardSpeed - deceleration * 0.22 * dt);
   }
 
-  if (braking) {
+  if (input.brake) {
     state.forwardSpeed = Math.max(0, state.forwardSpeed - deceleration * dt);
   }
 
   // Lane input changes the target lane, while actual movement is smoothed.
-  if (keys.has("KeyA") || keys.has("ArrowLeft")) {
+  if (input.left) {
     if (!state._leftLatch) {
       state.laneTarget = Math.max(0, state.laneTarget - 1);
       state._leftLatch = true;
@@ -232,7 +263,7 @@ function update(dt) {
     state._leftLatch = false;
   }
 
-  if (keys.has("KeyD") || keys.has("ArrowRight")) {
+  if (input.right) {
     if (!state._rightLatch) {
       state.laneTarget = Math.min(road.laneCount - 1, state.laneTarget + 1);
       state._rightLatch = true;
@@ -255,7 +286,7 @@ function update(dt) {
 
   state.roadOffset = (state.roadOffset + state.forwardSpeed * dt * 0.95) % 1;
 
-  player.update(dt, keys, state);
+  player.update(dt, input, state);
   traffic.update(dt, state.forwardSpeed);
 
   checkTrafficCollisions();

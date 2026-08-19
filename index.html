@@ -27,6 +27,26 @@
       <span>WASD</span>
       <span id="speed">0 km/h</span>
     </div>
+
+    <div id="touch-controls" role="group" aria-label="Driving controls">
+      <div class="touch-controls__group touch-controls__steering">
+        <button class="touch-control" type="button" data-action="left" aria-label="Steer left">
+          <span aria-hidden="true">◀</span>
+        </button>
+        <button class="touch-control" type="button" data-action="right" aria-label="Steer right">
+          <span aria-hidden="true">▶</span>
+        </button>
+      </div>
+
+      <div class="touch-controls__group touch-controls__speed">
+        <button class="touch-control touch-control--accelerate" type="button" data-action="accelerate" aria-label="Accelerate">
+          <span aria-hidden="true">▲</span>
+        </button>
+        <button class="touch-control touch-control--brake" type="button" data-action="brake" aria-label="Brake">
+          <span aria-hidden="true">BRAKE</span>
+        </button>
+      </div>
+    </div>
   </main>
 
   <script type="module" src="src/main.js"></script>

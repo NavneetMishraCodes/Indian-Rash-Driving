@@ -24,7 +24,10 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: none;
+}
+
+#touch-controls {
+  display: none;
 }
 
 #hud {
@@ -46,4 +49,68 @@ canvas {
   border-radius: 7px;
   background: rgba(0,0,0,.28);
   backdrop-filter: blur(5px);
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  #touch-controls {
+    position: absolute;
+    inset: 0;
+    display: block;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .touch-controls__group {
+    position: absolute;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    display: flex;
+    gap: clamp(0.65rem, 3vw, 1rem);
+    pointer-events: none;
+  }
+
+  .touch-controls__steering {
+    left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .touch-controls__speed {
+    right: max(1rem, env(safe-area-inset-right));
+    flex-direction: column;
+  }
+
+  .touch-control {
+    display: grid;
+    width: clamp(3.8rem, 17vw, 5.4rem);
+    height: clamp(3.8rem, 17vw, 5.4rem);
+    place-items: center;
+    border: 1px solid rgba(255, 244, 189, 0.5);
+    border-radius: 50%;
+    background: rgba(20, 29, 34, 0.72);
+    box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.30), inset 0 1px rgba(255,255,255,.16);
+    color: #fff4c7;
+    font: 800 clamp(1.15rem, 5vw, 1.6rem) / 1 system-ui, sans-serif;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    touch-action: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+  }
+
+  .touch-control--accelerate {
+    background: rgba(105, 46, 35, 0.78);
+  }
+
+  .touch-control--brake {
+    border-radius: 1.1rem;
+    background: rgba(61, 42, 36, 0.78);
+    font-size: clamp(0.68rem, 3vw, 0.9rem);
+    letter-spacing: 0.06em;
+  }
+
+  .touch-control.is-active,
+  .touch-control:active {
+    transform: scale(0.94);
+    border-color: #fff4c7;
+    background: rgba(201, 54, 50, 0.92);
+    box-shadow: 0 0.15rem 0.6rem rgba(0, 0, 0, 0.40), inset 0 1px rgba(255,255,255,.25);
+  }
 }

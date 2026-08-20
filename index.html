@@ -28,6 +28,19 @@
       <span id="speed">0 km/h</span>
     </div>
 
+    <div id="score-hud" aria-live="polite">
+      <div class="score-hud__score">
+        <span class="score-hud__label">SCORE</span>
+        <span class="score-hud__value" id="score-value">0</span>
+      </div>
+      <div class="score-hud__streak" id="streak-wrap">
+        <span class="score-hud__streak-label" id="streak-label">STREAK</span>
+        <span class="score-hud__streak-value" id="streak-value">x0</span>
+      </div>
+    </div>
+
+    <div id="score-popups" aria-hidden="true"></div>
+
     <div id="touch-controls" role="group" aria-label="Driving controls">
       <div class="touch-controls__group touch-controls__steering">
         <button class="touch-control" type="button" data-action="left" aria-label="Steer left">

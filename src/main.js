@@ -166,10 +166,82 @@ const player = new PlayerCar();
 const scoring = new ScoringSystem();
 
 const traffic = new TrafficSystem((car) => {
-  scoring.registerMiss(car);
+  const event = scoring.registerMiss(car);
+  handleScoreMiss(event);
 });
 
 traffic.start();
+
+// ============================================================
+// SCORE HUD / POPUP PRESENTATION
+// Consumer of ScoringSystem events only. No scoring logic here.
+// ============================================================
+const scoreHud = document.querySelector("#score-hud");
+const scoreValueEl = document.querySelector("#score-value");
+const streakLabelEl = document.querySelector("#streak-label");
+const streakValueEl = document.querySelector("#streak-value");
+const popupLayer = document.querySelector("#score-popups");
+
+const streakReducedMotion =
+  window.matchMedia("(prefers-reduced-motion: reduce)");
+
+let streakWasActive = false;
+
+function formatScore(value) {
+  return value.toLocaleString("en-US");
+}
+
+function setStreakDisplay(active) {
+  scoreHud.classList.toggle("is-streak-active", active);
+  streakLabelEl.textContent = active ? "🔥 STREAK ACTIVE" : "STREAK";
+}
+
+function triggerStreakActivation() {
+  // Remove + re-add the class so the CSS pulse animation replays
+  // only on the transition into the active state.
+  scoreHud.classList.remove("is-streak-activating");
+  void scoreHud.offsetWidth; // force reflow so the animation restarts
+  scoreHud.classList.add("is-streak-activating");
+}
+
+function spawnScorePopup(gain, hasBonus) {
+  const el = document.createElement("div");
+  el.className = "score-popup" + (hasBonus ? " score-popup--bonus" : "");
+  el.textContent = `+${gain}`;
+  popupLayer.appendChild(el);
+
+  if (streakReducedMotion.matches) {
+    // Reduced motion: CSS animation is disabled, so fade + remove.
+    requestAnimationFrame(() => el.classList.add("is-fading"));
+    setTimeout(() => el.remove(), 400);
+  } else {
+    el.addEventListener("animationend", () => el.remove(), { once: true });
+  }
+}
+
+function handleScoreHit(event) {
+  scoreValueEl.textContent = formatScore(event.totalScore);
+  streakValueEl.textContent = `x${event.streakCount}`;
+
+  const becameActive = event.streakActive && !streakWasActive;
+
+  setStreakDisplay(event.streakActive);
+
+  if (becameActive) {
+    triggerStreakActivation();
+  }
+
+  streakWasActive = event.streakActive;
+
+  spawnScorePopup(event.gain, event.bonus > 0);
+}
+
+function handleScoreMiss(event) {
+  streakWasActive = false;
+  setStreakDisplay(false);
+  streakValueEl.textContent = "x0";
+  // Total score is unchanged; no popup is created for a miss.
+}
 
 const scenery = [];
 const SCENERY_COUNT = 90;
@@ -267,7 +339,9 @@ function checkTrafficCollisions() {
 
     car.launch(launchDirection);
 
-    scoring.registerHit(car);
+    const hitEvent = scoring.registerHit(car);
+
+    handleScoreHit(hitEvent);
 
     playRandomCollisionSound();
 

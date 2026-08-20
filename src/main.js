@@ -1,5 +1,6 @@
 import { PlayerCar } from "./entities/PlayerCar.js";
 import { TrafficSystem } from "./systems/TrafficSystem.js";
+import { ScoringSystem } from "./systems/ScoringSystem.js";
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -162,7 +163,11 @@ const road = {
 
 const player = new PlayerCar();
 
-const traffic = new TrafficSystem();
+const scoring = new ScoringSystem();
+
+const traffic = new TrafficSystem((car) => {
+  scoring.registerMiss(car);
+});
 
 traffic.start();
 
@@ -261,6 +266,8 @@ function checkTrafficCollisions() {
       car.lane < state.lane ? -1 : 1;
 
     car.launch(launchDirection);
+
+    scoring.registerHit(car);
 
     playRandomCollisionSound();
 

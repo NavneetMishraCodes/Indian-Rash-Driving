@@ -21,6 +21,13 @@ export class TrafficCar {
     this.hitVelocityDepth = 0;
 
     this.hitSpin = 0;
+
+    // Whether this car has actually entered the playable/encounter
+    // region (i.e. traveled up from the horizon toward the player).
+    // Startup cars spawned already past this region never set this,
+    // so they cannot be counted as misses.
+    this.enteredEncounter = false;
+    this.prevDepth = 0;
   }
 
   reset(lane, depth, speed, type) {
@@ -40,13 +47,29 @@ export class TrafficCar {
     this.hitVelocityDepth = 0;
 
     this.hitSpin = 0;
+
+    this.enteredEncounter = false;
+    this.prevDepth = depth;
   }
 
   update(dt, playerSpeed) {
     // Normal traffic movement.
     if (!this.hit) {
+      const prevDepth = this.depth;
       this.depth +=
         (playerSpeed + this.speed) * dt;
+
+      // Mark the car as having entered the encounter region only when
+      // it crosses the threshold from below (i.e. it actually traveled
+      // toward the player). Cars spawned already past this threshold
+      // (startup traffic) never cross it, so they never count as misses.
+      if (
+        !this.enteredEncounter &&
+        prevDepth < 0.9 &&
+        this.depth >= 0.9
+      ) {
+        this.enteredEncounter = true;
+      }
 
       return;
     }

@@ -2,8 +2,10 @@ import { TrafficCar } from "../entities/TrafficCar.js";
 
 export class TrafficSystem {
 
-  constructor() {
+  constructor(onMiss = null) {
     this.cars = [];
+
+    this.onMiss = onMiss;
 
     this.maxCars = 20;
 
@@ -122,13 +124,27 @@ export class TrafficSystem {
         i >= 0;
         i--
     ) {
+        const car = this.cars[i];
+
         if (
-          this.cars[i].depth > 1.15 ||
+          car.depth > 1.15 ||
           (
-            this.cars[i].hit &&
-            this.cars[i].hitAge >= this.cars[i].hitLifetime
+            car.hit &&
+            car.hitAge >= car.hitLifetime
           )
         ) {
+        // A genuine miss: an unhit car that actually entered the
+        // encounter region and then passed the player. Startup cars
+        // spawned already past the encounter region never set
+        // enteredEncounter, so they are never reported as misses.
+        if (
+            !car.hit &&
+            car.enteredEncounter &&
+            this.onMiss
+        ) {
+            this.onMiss(car);
+        }
+
         this.cars.splice(i, 1);
         }
     }

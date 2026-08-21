@@ -29,13 +29,31 @@ const AUDIO_BASE =
     : "public/audio/collisions/";
 
 const COLLISION_SOUNDS = [
-  `${AUDIO_BASE}cid.mp3`,
-  `${AUDIO_BASE}cid-chut.mp3`,
-  `${AUDIO_BASE}kyu-re-madarchod-cid.mp3`,
   `${AUDIO_BASE}atmkbfjg-echo.mp3`,
-  `${AUDIO_BASE}dil-na-diya.mp3`,
+  `${AUDIO_BASE}chicken-on-tree-screaming.mp3`,
+  `${AUDIO_BASE}cid.mp3`,
   `${AUDIO_BASE}cid-acp-behn-choo.mp3`,
+  `${AUDIO_BASE}cid-chut.mp3`,
   `${AUDIO_BASE}cid-le-mdc.mp3`,
+  `${AUDIO_BASE}cid-tum-bl-k-f.mp3`,
+  `${AUDIO_BASE}contesta-punetas.mp3`,
+  `${AUDIO_BASE}dil-na-diya.mp3`,
+  `${AUDIO_BASE}fe-n-travis-scott.mp3`,
+  `${AUDIO_BASE}f-you-baltimore.mp3`,
+  `${AUDIO_BASE}gta-san-andreas-ah-shit-here-we-go-again.mp3`,
+  `${AUDIO_BASE}hello-moto-estourado.mp3`,
+  `${AUDIO_BASE}i-sh-t-my-pants-aldi.mp3`,
+  `${AUDIO_BASE}kyu-re-madarchod-cid.mp3`,
+  `${AUDIO_BASE}miguel-miguel_BwNUGvA.mp3`,
+  `${AUDIO_BASE}mr-beast-phonk-meme-mp3.mp3`,
+  `${AUDIO_BASE}naam-ya-daam-naam-ravi-kishan.mp3`,
+  `${AUDIO_BASE}nahi-nahi-salec-yaha-kuchh-to-gadbad-hai.mp3`,
+  `${AUDIO_BASE}oi-oi-oe-oi-a-eye-eye.mp3`,
+  `${AUDIO_BASE}phir-teri-maiya-chodta-hu-cid.mp3`,
+  `${AUDIO_BASE}really-nig.mp3`,
+  `${AUDIO_BASE}tralalero-funk.mp3`,
+  `${AUDIO_BASE}what-the-hell-omg-no-wayyyyy.mp3`,
+  `${AUDIO_BASE}yes-yes-yes-kibidi.mp3`,
 ];
 
 let currentCollisionAudio = null;

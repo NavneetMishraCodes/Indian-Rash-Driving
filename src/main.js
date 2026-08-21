@@ -279,6 +279,16 @@ function rand(min, max) {
   return min + Math.random() * (max - min);
 }
 
+// Deterministic pseudo-random value from an integer seed.
+// Used so grass blades live in world cells and scroll coherently
+// instead of re-randomizing every frame.
+function hash01(seed) {
+  let n = (seed ^ 0x9e3779b9) | 0;
+  n = Math.imul(n ^ (n >>> 16), 0x7feb352d);
+  n = Math.imul(n ^ (n >>> 15), 0x846ca68b);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+
 function makeScenery() {
   scenery.length = 0;
 
@@ -444,7 +454,7 @@ function update(dt) {
 
   // Move scenery toward camera and recycle it.
   for (const obj of scenery) {
-    obj.depth += state.forwardSpeed * dt * 0.72;
+    obj.depth += state.forwardSpeed * dt * 0.95;
     if (obj.depth > 1.08) {
       obj.depth -= 1.08;
 
@@ -496,30 +506,65 @@ function draw() {
 }
 
 function drawGrass(w, h) {
-  // Subtle horizontal bands provide depth without heavy textures.
   const horizon = h * road.horizonY;
-  const bandCount = 18;
 
-  for (let i = 0; i < bandCount; i++) {
-    const t = i / bandCount;
-    const y0 = lerp(horizon, h, Math.pow(t, 1.6));
-    const y1 = lerp(horizon, h, Math.pow((i + 1) / bandCount, 1.6));
-    ctx.fillStyle = i % 2 ? "#76a65b" : "#729e58";
+  // Ground bands scroll at the same rate as the road markings
+  // (state.roadOffset), so the roadside flows past the player in sync.
+  const bandCount = 18;
+  const bandScroll = state.roadOffset * bandCount;
+
+  for (let k = -bandCount; k < bandCount; k++) {
+    const d0 = (k + bandScroll) / bandCount;
+    const d1 = (k + 1 + bandScroll) / bandCount;
+    if (d1 <= 0 || d0 >= 1) continue;
+
+    const s = Math.max(0, d0);
+    const e = Math.min(1, d1);
+    const y0 = lerp(horizon, h, Math.pow(s, 1.6));
+    const y1 = lerp(horizon, h, Math.pow(e, 1.6));
+    ctx.fillStyle = k % 2 ? "#76a65b" : "#729e58";
     ctx.fillRect(0, y0, w, y1 - y0 + 1);
   }
 
-  // Very light grass strokes.
+  // Grass blades: each lives in a world cell that scrolls with the road,
+  // so they flow past the player instead of flickering in place.
+  const cellCount = 32;
+  const cellScroll = state.roadOffset * cellCount;
+
   ctx.globalAlpha = 0.12;
   ctx.strokeStyle = "#d7e8b9";
   ctx.lineWidth = 1;
-  for (let i = 0; i < 130; i++) {
-    const x = Math.random() * w;
-    const y = horizon + Math.random() * (h - horizon);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + rand(-2, 2), y - rand(2, 6));
-    ctx.stroke();
+
+  for (let c = -cellCount; c < cellCount; c++) {
+    const d0 = (c + cellScroll) / cellCount;
+    const d1 = (c + 1 + cellScroll) / cellCount;
+    if (d1 <= 0 || d0 >= 1) continue;
+
+    const s = Math.max(0, d0);
+    const e = Math.min(1, d1);
+    const y0 = lerp(horizon, h, Math.pow(s, 1.6));
+    const y1 = lerp(horizon, h, Math.pow(e, 1.6));
+
+    // World cell identity, stable across scroll wrapping.
+    const wc = ((c + Math.floor(cellScroll)) % cellCount + cellCount) % cellCount;
+
+    for (let b = 0; b < 4; b++) {
+      const seed = wc * 10 + b;
+      const bladeT = hash01(seed);
+      const depth = s + (e - s) * bladeT;
+      const y = lerp(y0, y1, bladeT);
+      const x = w * hash01(seed + 1);
+      const growth = Math.pow(depth, 1.3);
+      const height = 1 + growth * 7;
+      const lean = (hash01(seed + 2) - 0.5) * 6;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + lean, y - height);
+      ctx.stroke();
+    }
   }
+
   ctx.globalAlpha = 1;
 }
 

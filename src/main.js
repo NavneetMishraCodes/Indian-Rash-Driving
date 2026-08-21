@@ -318,53 +318,106 @@ function hash01(seed) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
 
-// Weighted pool of Indian roadside prop types. Higher weight = more common.
-// Keeps the roadside varied: empty patches, trees, shops, stalls, walls,
-// poles, signs, billboards, buildings, and occasional larger structures.
-const SCENERY_TYPES = [
-  { kind: "tree", weight: 14 },
-  { kind: "tree", weight: 14 },
-  { kind: "bush", weight: 10 },
-  { kind: "wall", weight: 10 },
-  { kind: "shop", weight: 8 },
-  { kind: "chaiStall", weight: 6 },
-  { kind: "foodStall", weight: 5 },
-  { kind: "house", weight: 8 },
-  { kind: "utilityPole", weight: 8 },
-  { kind: "sign", weight: 5 },
-  { kind: "billboard", weight: 5 },
-  { kind: "dhaba", weight: 3 },
-  { kind: "busStop", weight: 3 },
-  { kind: "petrolPump", weight: 2 },
-  { kind: "cart", weight: 4 },
-  { kind: "empty", weight: 8 }
+// ============================================================
+// INDIAN ROADSIDE COMPOSITIONS
+// Each entry is a mini-cluster that gives the roadside an authored
+// rhythm (market → dhaba → mechanic → bus stop → petrol → village
+// → open highway …) instead of pure random scatter.
+// ============================================================
+const ROADSIDE_SECTIONS = [
+  ["shop", "chaiStall", "motorcycle", "utilityPole", "wall", "auto"],
+  ["dhaba", "foodStall", "cart", "motorcycle", "sign", "utilityPole"],
+  ["repair", "service", "clutter", "utilityPole", "barrels", "motorcycle"],
+  ["busStop", "sign", "kiosk", "auto", "chaiStall"],
+  ["petrolPump", "sign", "hoarding"],
+  ["bigTree", "tree", "house", "utilityPole", "wall"],
+  ["house", "house", "wall", "bigTree", "tree"],
+  ["haat", "fruit", "waterKiosk", "cart", "chaiStall"],
+  ["tree", "bush", "bigTree", "open", "bush"],
+  ["open", "tree", "bush", "open"],
+  ["billboard", "hoarding", "open", "tree", "billboard"],
+  ["temple", "tree", "wall", "bigTree"],
+  ["auto", "truck", "clutter", "barrels", "repair"],
+  ["waterKiosk", "chaiStall", "shop", "sign", "kiosk"]
 ];
 
+let sectionIndex = 0;
+
+// Per-object visual scale multiplier. Large highway props get a big boost,
+// small clutter stays near 1. This is what makes the roadside read clearly
+// at driving speed.
+const PROP_SIZES = {
+  billboard: 2.0,
+  hoarding: 1.7,
+  dhaba: 1.8,
+  petrolPump: 1.7,
+  busStop: 1.45,
+  utilityPole: 1.55,
+  repair: 1.35,
+  service: 1.35,
+  shop: 1.3,
+  kiosk: 1.3,
+  waterKiosk: 1.25,
+  house: 1.2,
+  truck: 1.35,
+  auto: 1.05,
+  motorcycle: 1.0,
+  cart: 1.15,
+  fruit: 1.15,
+  chaiStall: 1.2,
+  foodStall: 1.15,
+  haat: 1.3,
+  bigTree: 1.55,
+  tree: 1.15,
+  temple: 1.25,
+  sign: 1.25,
+  wall: 1.15,
+  clutter: 1.0,
+  barrels: 1.0,
+  drain: 1.0,
+  open: 1.0
+};
+
 function pickSceneryKind() {
-  let total = 0;
-  for (const t of SCENERY_TYPES) total += t.weight;
-  let r = Math.random() * total;
-  for (const t of SCENERY_TYPES) {
-    r -= t.weight;
-    if (r <= 0) return t.kind;
-  }
-  return "tree";
+  const pool = ROADSIDE_SECTIONS[sectionIndex % ROADSIDE_SECTIONS.length];
+  sectionIndex++;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function makeScenery() {
   scenery.length = 0;
+  sectionIndex = 0;
+
+  let clusterSide = 1;
 
   for (let i = 0; i < SCENERY_COUNT; i++) {
+    // Keep a few consecutive props on the same side so the sections
+    // read as roadside clusters rather than isolated objects.
+    if (i % 4 === 0) {
+      clusterSide = Math.random() < 0.5 ? 1 : -1;
+    }
+
+    const kind = pickSceneryKind();
+
     scenery.push({
-      side: Math.random() < 0.5 ? -1 : 1,
+      side: clusterSide,
       depth: Math.random(),
       offset: rand(1.45, 2.45),
-      kind: pickSceneryKind(),
+      kind,
+      size: PROP_SIZES[kind] || 1,
       phase: Math.random() * TAU,
       // Per-object variation so recycled props don't look identical.
       variant: Math.floor(Math.random() * 4),
       color: Math.random(),
-      billboard: null
+      // Feature flags used by the draw functions.
+      water: kind === "house" && Math.random() < 0.5,
+      transformer:
+        kind === "utilityPole" && Math.random() < 0.35,
+      gate: kind === "wall" && Math.random() < 0.45,
+      billboard:
+        kind === "billboard" && BILLBOARD_IMAGES.length > 0
+          ? BILLBOARD_IMAGES[Math.floor(Math.random() * BILLBOARD_IMAGES.length)]
+          : null
     });
   }
 }
@@ -520,11 +573,17 @@ function update(dt) {
       // Keep every object safely away from the road.
       obj.offset = rand(1.45, 2.45);
 
-      // Re-pick a weighted Indian roadside prop type.
+      // Re-pick from the section compositions.
       obj.kind = pickSceneryKind();
+      obj.size = PROP_SIZES[obj.kind] || 1;
       obj.phase = Math.random() * TAU;
       obj.variant = Math.floor(Math.random() * 4);
       obj.color = Math.random();
+
+      obj.water = obj.kind === "house" && Math.random() < 0.5;
+      obj.transformer =
+        obj.kind === "utilityPole" && Math.random() < 0.35;
+      obj.gate = obj.kind === "wall" && Math.random() < 0.45;
 
       // Assign a billboard texture (or null for empty billboards).
       obj.billboard =
@@ -813,14 +872,18 @@ function drawScenery(w, h) {
     const x = w * (0.5 + obj.side * p.width * obj.offset);
     const y = h * p.y;
 
+    // Base perspective scale, then a per-prop size multiplier so big
+    // highway props (billboards, dhabas, petrol pumps, poles) read much
+    // larger than small clutter on screen.
     const scale = lerp(
       0.18,
       1.15,
       Math.pow(obj.depth, 1.3)
-    );
+    ) * (obj.size || 1);
 
     switch (obj.kind) {
       case "tree":
+      case "bigTree":
         drawTree(x, y, scale, obj.variant);
         break;
       case "bush":
@@ -828,6 +891,9 @@ function drawScenery(w, h) {
         break;
       case "wall":
         drawWall(x, y, scale, obj.side, obj.color);
+        break;
+      case "house":
+        drawHouse(x, y, scale, obj.side, obj.color, obj.water);
         break;
       case "shop":
         drawShop(x, y, scale, obj.side, obj.color);
@@ -838,11 +904,50 @@ function drawScenery(w, h) {
       case "foodStall":
         drawFoodStall(x, y, scale, obj.side, obj.color);
         break;
-      case "house":
-        drawHouse(x, y, scale, obj.side, obj.color);
+      case "kiosk":
+        drawKiosk(x, y, scale, obj.color);
+        break;
+      case "waterKiosk":
+        drawWaterKiosk(x, y, scale, obj.color);
+        break;
+      case "haat":
+        drawHaat(x, y, scale, obj.color);
+        break;
+      case "fruit":
+        drawFruit(x, y, scale, obj.color);
+        break;
+      case "auto":
+        drawAuto(x, y, scale);
+        break;
+      case "motorcycle":
+        drawMotorcycle(x, y, scale);
+        break;
+      case "truck":
+        drawTruck(x, y, scale);
+        break;
+      case "repair":
+        drawRepair(x, y, scale, obj.color);
+        break;
+      case "service":
+        drawService(x, y, scale, obj.color);
+        break;
+      case "temple":
+        drawTemple(x, y, scale, obj.color);
+        break;
+      case "hoarding":
+        drawHoarding(x, y, scale, obj.color);
+        break;
+      case "clutter":
+        drawClutter(x, y, scale, obj.color);
+        break;
+      case "barrels":
+        drawBarrels(x, y, scale, obj.color);
+        break;
+      case "drain":
+        drawDrain(x, y, scale);
         break;
       case "utilityPole":
-        drawUtilityPole(x, y, scale, obj.side);
+        drawUtilityPole(x, y, scale, obj.side, obj.transformer);
         break;
       case "sign":
         drawSign(x, y, scale, obj.side, obj.color);
@@ -862,9 +967,9 @@ function drawScenery(w, h) {
       case "cart":
         drawCart(x, y, scale, obj.side, obj.color);
         break;
-      case "empty":
+      case "open":
       default:
-        // Empty patch — nothing drawn.
+        // Open ground / empty patch — nothing drawn.
         break;
     }
   }
@@ -1108,6 +1213,425 @@ function drawBush(x, y, s) {
 // INDIAN ROADSIDE PROPS (procedural, lightweight Canvas2D)
 // ============================================================
 
+
+
+
+
+
+
+// Auto-rickshaw (parked roadside prop).
+function drawAuto(x, y, s) {
+  const w = 30 * s;
+  const h = 26 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.6, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Lower body
+  ctx.fillStyle = "#333";
+  ctx.fillRect(x - w / 2, y - h / 2, w * 0.62, h / 2);
+
+  // Upper canopy (rounded)
+  ctx.fillStyle = "#c93632";
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.31, y - h / 2);
+  ctx.quadraticCurveTo(x, y - h, x + w * 0.31, y - h / 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windshield
+  ctx.fillStyle = "#9bc7e6";
+  ctx.fillRect(x - 8 * s, y - h * 0.5, 16 * s, 5 * s);
+
+  // Wheels
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.25, y - 2 * s, 3.5 * s, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.25, y - 2 * s, 3.5 * s, 0, TAU);
+  ctx.fill();
+}
+
+// Motorcycle / scooter parked roadside.
+function drawMotorcycle(x, y, s) {
+  const w = 26 * s;
+  const h = 18 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.12)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.5, 4 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Body / seat
+  ctx.fillStyle = "#444";
+  ctx.fillRect(x - w * 0.2, y - h, w * 0.55, h * 0.75);
+
+  // Handlebar
+  ctx.strokeStyle = "#222";
+  ctx.lineWidth = Math.max(1, 2 * s);
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.2, y - h * 0.9);
+  ctx.lineTo(x + w * 0.26, y - h);
+  ctx.stroke();
+
+  // Wheels
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.28, y - 2 * s, 3.5 * s, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.28, y - 2 * s, 3.5 * s, 0, TAU);
+  ctx.fill();
+}
+
+// Truck / mini truck (parked scenery).
+function drawTruck(x, y, s) {
+  const w = 50 * s;
+  const h = 26 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.6, 6 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Cargo box
+  ctx.fillStyle = "#7a6a5a";
+  ctx.fillRect(x - w * 0.1, y - h, w * 0.55, h);
+
+  // Cab
+  ctx.fillStyle = "#4a6a8a";
+  ctx.fillRect(x - w * 0.45, y - h * 0.85, w * 0.4, h * 0.6);
+
+  // Cab window
+  ctx.fillStyle = "#9bc7e6";
+  ctx.fillRect(x - w * 0.4, y - h * 0.8, w * 0.16, h * 0.18);
+
+  // Wheels
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.3, y - 2 * s, 5 * s, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.28, y - 2 * s, 5 * s, 0, TAU);
+  ctx.fill();
+}
+
+// Kiosk (tiny box stall).
+function drawKiosk(x, y, s, color) {
+  const w = 32 * s;
+  const h = 30 * s;
+  const palette = ["#c93632", "#2a4a6a", "#6a8a2a", "#8a5a2a"];
+  const accent = palette[Math.floor(color * palette.length) % palette.length];
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.5, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Box body
+  ctx.fillStyle = "#d9c09b";
+  ctx.fillRect(x - w / 2, y - h, w, h);
+
+  // Open front
+  ctx.fillStyle = "#3a2a20";
+  ctx.fillRect(x - w * 0.3, y - h * 0.5, w * 0.6, h * 0.5);
+
+  // Corrugated roof
+  ctx.fillStyle = "#777";
+  ctx.fillRect(x - w / 2 - 3 * s, y - h - 4 * s, w + 6 * s, 5 * s);
+
+  // Colorful sign
+  ctx.fillStyle = accent;
+  ctx.fillRect(x - w * 0.35, y - h - 1 * s, w * 0.7, 6 * s);
+}
+
+// Water / cool-drink kiosk.
+function drawWaterKiosk(x, y, s, color) {
+  const w = 36 * s;
+  const h = 28 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.5, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Canopy
+  ctx.fillStyle = color < 0.5 ? "#2a6a8a" : "#8a2a3a";
+  ctx.fillRect(x - w / 2 - 3 * s, y - h - 5 * s, w + 6 * s, 5 * s);
+
+  // Counter
+  ctx.fillStyle = "#5a4a3a";
+  ctx.fillRect(x - w / 2, y - h * 0.72, w, 6 * s);
+
+  // Cooler/fridge box
+  ctx.fillStyle = "#e8e4d8";
+  ctx.fillRect(x - w * 0.2, y - h, w * 0.4, h * 0.5);
+  ctx.strokeStyle = "#999";
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.strokeRect(x - w * 0.2, y - h, w * 0.4, h * 0.5);
+
+  // Bottles (tiny colored columns)
+  ctx.fillStyle = "#3a7a3a";
+  ctx.fillRect(x + w * 0.1, y - h * 0.7, 2.5 * s, 6 * s);
+  ctx.fillStyle = "#c9a93a";
+  ctx.fillRect(x + w * 0.22, y - h * 0.7, 2.5 * s, 6 * s);
+}
+
+// Village haat / local produce stall.
+function drawHaat(x, y, s, color) {
+  const w = 60 * s;
+  const h = 22 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 6 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Cloth canopy
+  ctx.fillStyle = color < 0.33 ? "#c93632" : color < 0.66 ? "#3a6aa8" : "#c8a83a";
+  ctx.fillRect(x - w * 0.52, y - h * 0.85, w * 1.04, 7 * s);
+
+  // Support poles
+  ctx.fillStyle = "#5a4a3a";
+  ctx.fillRect(x - w * 0.5, y - h * 0.7, 3 * s, h * 0.7);
+  ctx.fillRect(x + w * 0.47, y - h * 0.7, 3 * s, h * 0.7);
+
+  // Table
+  ctx.fillStyle = "#8a6a4a";
+  ctx.fillRect(x - w * 0.5, y - h * 0.6, w, 5 * s);
+
+  // Produce piles
+  ctx.fillStyle = "#c8a83a";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.3, y - h * 0.65, 3 * s, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#3a8a3a";
+  ctx.beginPath();
+  ctx.arc(x, y - h * 0.68, 3 * s, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#c85a3a";
+  ctx.beginPath();
+  ctx.arc(x + w * 0.3, y - h * 0.65, 3 * s, 0, TAU);
+  ctx.fill();
+}
+
+// Fruit/vegetable thela (cart with produce).
+function drawFruit(x, y, s, color) {
+  const w = 34 * s;
+  const h = 22 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.12)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Platform
+  ctx.fillStyle = "#8a6a4a";
+  ctx.fillRect(x - w / 2, y - h * 0.7, w, 4 * s);
+
+  // Produce clusters (colored circles)
+  const fruitColors = ["#c85a3a", "#c8a83a", "#3a8a3a", "#c8d83a", "#c8362a"];
+  for (let i = -2, ci = 0; i <= 2; i++, ci++) {
+    ctx.fillStyle = fruitColors[(ci + Math.floor(color * 3)) % fruitColors.length];
+    ctx.beginPath();
+    ctx.arc(x + i * 6 * s, y - h * 0.85, 4 * s, 0, TAU);
+    ctx.fill();
+  }
+
+  // Cloth shade on top
+  ctx.fillStyle = "#d8c8a8";
+  ctx.fillRect(x - 10 * s, y - h, 20 * s, 3 * s);
+
+  // Wheels
+  ctx.fillStyle = "#333";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.32, y - 2 * s, 4 * s, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.32, y - 2 * s, 4 * s, 0, TAU);
+  ctx.fill();
+}
+
+// Repair / puncture shop (corrugated shed + tires).
+function drawRepair(x, y, s, color) {
+  const w = 48 * s;
+  const h = 26 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Corrugated roof
+  ctx.fillStyle = "#777";
+  ctx.fillRect(x - w / 2 - 4 * s, y - h - 5 * s, w + 8 * s, 6 * s);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = "rgba(255,255,255,.15)";
+    ctx.fillRect(x - w / 2 - 4 * s + i * ((w + 8 * s) / 6), y - h - 5 * s, 2 * s, 6 * s);
+  }
+
+  // Open front
+  ctx.fillStyle = "#3a2f2a";
+  ctx.fillRect(x - w / 2, y - h, w, h * 0.8);
+
+  // Tire stack (recognizable)
+  ctx.strokeStyle = "#222";
+  ctx.lineWidth = Math.max(1, 2 * s);
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(x - w * 0.35, y - h + i * 6 * s, 6 * s, 3 * s, 0, 0, TAU);
+    ctx.stroke();
+  }
+
+  // Toolbox
+  ctx.fillStyle = "#c84a2a";
+  ctx.fillRect(x + w * 0.15, y - h + 2 * s, 10 * s, 6 * s);
+}
+
+// Service shed (wider, lower).
+function drawService(x, y, s, color) {
+  const w = 60 * s;
+  const h = 20 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 5 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Corrugated roof
+  ctx.fillStyle = "#8a6a4a";
+  ctx.fillRect(x - w / 2 - 4 * s, y - h - 5 * s, w + 8 * s, 6 * s);
+
+  // Open front
+  ctx.fillStyle = "#3a2f2a";
+  ctx.fillRect(x - w / 2, y - h, w, h * 0.8);
+
+  // Air pump (vertical cylinder)
+  ctx.fillStyle = "#c93632";
+  ctx.fillRect(x + w * 0.25, y - h * 0.9, 4 * s, 12 * s);
+  ctx.fillStyle = "#e8e4d8";
+  ctx.fillRect(x + w * 0.25 - 1 * s, y - h * 0.9, 6 * s, 3 * s);
+}
+
+// Small temple / roadside shrine (occasional).
+function drawTemple(x, y, s, color) {
+  const w = 26 * s;
+  const h = 22 * s;
+
+  ctx.fillStyle = "rgba(0,0,0,.12)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, w * 0.5, 4 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Raised platform
+  ctx.fillStyle = "#c8b8a0";
+  ctx.fillRect(x - w / 2 - 2 * s, y - 4 * s, w + 4 * s, 4 * s);
+
+  // Shrine room
+  ctx.fillStyle = "#e8d8c0";
+  ctx.fillRect(x - w * 0.35, y - h, w * 0.7, h * 0.8);
+
+  // Pointed shikhara-like roof
+  ctx.fillStyle = "#c85a3a";
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.45, y - h);
+  ctx.lineTo(x, y - h - 8 * s);
+  ctx.lineTo(x + w * 0.45, y - h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Small flag / pole
+  ctx.strokeStyle = "#666";
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.2, y - h);
+  ctx.lineTo(x + w * 0.2, y - h - 14 * s);
+  ctx.stroke();
+  ctx.fillStyle = "#fff4c7";
+  ctx.fillRect(x + w * 0.2, y - h - 14 * s, 5 * s, 3 * s);
+
+  // Bell silhouette
+  ctx.fillStyle = "#c8a83a";
+  ctx.fillRect(x + w * 0.38, y - h * 0.6, 2 * s, 5 * s);
+}
+
+// Hoarding (long low advertising wall).
+function drawHoarding(x, y, s, color) {
+  const w = 90 * s;
+  const h = 28 * s;
+
+  // Support posts
+  ctx.fillStyle = "#666";
+  ctx.fillRect(x - w * 0.4, y - h - 6 * s, 4 * s, 6 * s);
+  ctx.fillRect(x + w * 0.4 - 4 * s, y - h - 6 * s, 4 * s, 6 * s);
+
+  // Board
+  ctx.fillStyle = color < 0.5 ? "#3a6aa8" : "#8a3a4a";
+  ctx.fillRect(x - w / 2, y - h, w, h);
+
+  // Border
+  ctx.strokeStyle = "#fff4c7";
+  ctx.lineWidth = Math.max(1, 2 * s);
+  ctx.strokeRect(x - w / 2, y - h, w, h);
+
+  // Sub-panels
+  ctx.fillStyle = "rgba(255,255,255,.25)";
+  ctx.fillRect(x - w * 0.35, y - h + 5 * s, w * 0.3, h * 0.4);
+  ctx.fillRect(x + w * 0.05, y - h + 5 * s, w * 0.3, h * 0.4);
+}
+
+// Road clutter (bricks, blocks, etc.).
+function drawClutter(x, y, s, color) {
+  ctx.fillStyle = "rgba(0,0,0,.10)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, 12 * s, 3 * s, 0, 0, TAU);
+  ctx.fill();
+
+  // Brick stack
+  ctx.fillStyle = "#c35d3a";
+  ctx.fillRect(x - 8 * s, y - 5 * s, 12 * s, 4 * s);
+  ctx.fillRect(x - 5 * s, y - 8 * s, 10 * s, 4 * s);
+
+  // Cement bags
+  ctx.fillStyle = "#d8d0c0";
+  ctx.fillRect(x + 6 * s, y - 6 * s, 9 * s, 6 * s);
+  ctx.strokeStyle = "#a89a80";
+  ctx.lineWidth = Math.max(1, 1 * s);
+  ctx.strokeRect(x + 6 * s, y - 6 * s, 9 * s, 6 * s);
+}
+
+// Barrels / drums.
+function drawBarrels(x, y, s, color) {
+  ctx.fillStyle = "rgba(0,0,0,.10)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2 * s, 12 * s, 3 * s, 0, 0, TAU);
+  ctx.fill();
+
+  const barrelColors = ["#3a6aa8", "#c8a83a", "#8a4a3a"];
+  for (let i = 0; i < 2; i++) {
+    ctx.fillStyle = barrelColors[(i + Math.floor(color * 2)) % barrelColors.length];
+    ctx.fillRect(x - 6 * s + i * 12 * s, y - 12 * s, 8 * s, 12 * s);
+  }
+}
+
+// Drain / culvert (ground blending).
+function drawDrain(x, y, s, color) {
+  ctx.fillStyle = "rgba(0,0,0,.08)";
+  ctx.fillRect(x - 18 * s, y - 2 * s, 36 * s, 4 * s);
+  ctx.fillStyle = "rgba(0,0,0,.14)";
+  ctx.fillRect(x - 14 * s, y - 1 * s, 28 * s, 2 * s);
+  // Concrete slabs
+  ctx.fillStyle = "#999";
+  ctx.fillRect(x - 22 * s, y - 3 * s, 6 * s, 3 * s);
+  ctx.fillRect(x + 16 * s, y - 3 * s, 6 * s, 3 * s);
+}
+// ============================================================
+// INDIAN ROADSIDE PROPS (procedural, lightweight Canvas2D)
+// ============================================================
+
 // Small roadside shop: rectangular structure, front opening, sign, awning.
 function drawShop(x, y, s, side, color) {
   const w = 60 * s;
@@ -1142,7 +1666,7 @@ function drawShop(x, y, s, side, color) {
   ctx.fillRect(x - 20 * s, y - h - 6 * s, 40 * s, 6 * s);
 }
 
-// Chai stall: small cart with counter, kettle, awning, cups.
+// Chai stall: recognized Indian chai stall.
 function drawChaiStall(x, y, s, side, color) {
   const w = 44 * s;
   const h = 26 * s;
@@ -1157,34 +1681,44 @@ function drawChaiStall(x, y, s, side, color) {
   ctx.fillStyle = "#8a6a4a";
   ctx.fillRect(x - w / 2, y - h, w, h);
 
-  // Counter top
+  // Counter top (with kettle)
   ctx.fillStyle = "#5a4a3a";
   ctx.fillRect(x - w / 2, y - h, w, 4 * s);
-
-  // Kettle (pot)
-  ctx.fillStyle = "#555";
+  // Kettle/pot on top
+  ctx.fillStyle = "#c93632";
   ctx.beginPath();
-  ctx.arc(x, y - h - 8 * s, 6 * s, 0, TAU);
+  ctx.arc(x, y - h - 4 * s, 5 * s, 0, TAU);
   ctx.fill();
   ctx.fillStyle = "#333";
-  ctx.fillRect(x - 2 * s, y - h - 14 * s, 4 * s, 4 * s);
+  ctx.fillRect(x - 2 * s, y - h - 10 * s, 4 * s, 4 * s);
+  // Spout
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = Math.max(1, 2 * s);
+  ctx.beginPath();
+  ctx.moveTo(x + 4 * s, y - h - 6 * s);
+  ctx.lineTo(x + 10 * s, y - h - 3 * s);
+  ctx.stroke();
+
+  // Cups beside kettle
+  ctx.fillStyle = "#e8e0d0";
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(x - 8 * s + i * 4 * s, y - h + 2 * s, 2.5 * s, 4 * s);
+  }
 
   // Awning (striped)
   ctx.fillStyle = "#c93632";
-  ctx.fillRect(x - w / 2, y - h - 16 * s, w, 6 * s);
+  ctx.fillRect(x - w / 2 - 3 * s, y - h - 14 * s, w + 6 * s, 6 * s);
   ctx.fillStyle = "#fff4c7";
   for (let i = 0; i < 5; i++) {
-    ctx.fillRect(x - w / 2 + i * (w / 5), y - h - 16 * s, w / 10, 6 * s);
+    ctx.fillRect(x - w / 2 - 3 * s + i * ((w + 6 * s) / 5), y - h - 14 * s, (w + 6 * s) / 10, 6 * s);
   }
 
-  // Cups on counter
-  ctx.fillStyle = "#e8e0d0";
-  for (let i = -1; i <= 1; i++) {
-    ctx.fillRect(x + i * 8 * s - 2 * s, y - h + 2 * s, 4 * s, 4 * s);
-  }
+  // Support pole
+  ctx.fillStyle = "#5a4a3a";
+  ctx.fillRect(x + w * 0.35, y - h - 14 * s, 2 * s, h - 30 * s + 14 * s);
 }
 
-// Street food stall: cart, counter, umbrella/awning, cooking area.
+// Street food stall: cart with two wheels, umbrella, cooking surface.
 function drawFoodStall(x, y, s, side, color) {
   const w = 50 * s;
   const h = 24 * s;
@@ -1199,14 +1733,23 @@ function drawFoodStall(x, y, s, side, color) {
   ctx.fillStyle = "#7a6a5a";
   ctx.fillRect(x - w / 2, y - h, w, h);
 
-  // Counter
+  // Counter top
   ctx.fillStyle = "#4a3a2a";
   ctx.fillRect(x - w / 2, y - h, w, 4 * s);
 
-  // Cooking area (dark circle)
+  // Cooking surface (tawa)
   ctx.fillStyle = "#222";
   ctx.beginPath();
-  ctx.arc(x - 10 * s, y - h - 4 * s, 5 * s, 0, TAU);
+  ctx.arc(x - 10 * s, y - h - 3 * s, 5 * s, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.stroke();
+
+  // Cooking pot
+  ctx.fillStyle = "#c93632";
+  ctx.beginPath();
+  ctx.arc(x + 10 * s, y - h - 2 * s, 4 * s, 0, TAU);
   ctx.fill();
 
   // Umbrella (red dome)
@@ -1216,248 +1759,295 @@ function drawFoodStall(x, y, s, side, color) {
   ctx.fill();
   ctx.fillStyle = "#fff4c7";
   ctx.fillRect(x - 1 * s, y - h - 18 * s, 2 * s, 8 * s);
+
+  // Wheels (clearly visible)
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(x - w * 0.3, y - 2 * s, 5 * s, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.3, y - 2 * s, 5 * s, 0, TAU);
+  ctx.fill();
 }
 
-// Utility/electric pole with crossbars and insulators.
-function drawUtilityPole(x, y, s, side) {
-  const poleH = 55 * s;
-  const poleW = 4 * s;
+// Utility pole: taller, with crossarms and possible transformer.
+function drawUtilityPole(x, y, s, side, hasTransformer) {
+  const poleH = 60 * s;
+  const poleW = 5 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, 8 * s, 3 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 2 * s, 10 * s, 3 * s, 0, 0, TAU);
   ctx.fill();
 
-  // Pole
-  ctx.fillStyle = "#5a4a3a";
+  // Pole (concrete)
+  ctx.fillStyle = "#8a8a80";
   ctx.fillRect(x - poleW / 2, y - poleH, poleW, poleH);
+  ctx.fillStyle = "#666";
+  ctx.fillRect(x - poleW / 2, y - poleH, poleW, 4 * s);
 
-  // Crossbars
-  ctx.fillStyle = "#4a3a2a";
-  ctx.fillRect(x - 14 * s, y - poleH + 8 * s, 28 * s, 3 * s);
-  ctx.fillRect(x - 10 * s, y - poleH + 18 * s, 20 * s, 3 * s);
+  // Crossarms (2-3)
+  ctx.fillStyle = "#777";
+  ctx.fillRect(x - 18 * s, y - poleH + 10 * s, 36 * s, 3.5 * s);
+  ctx.fillRect(x - 14 * s, y - poleH + 22 * s, 28 * s, 3 * s);
+  ctx.fillRect(x - 10 * s, y - poleH + 32 * s, 20 * s, 3 * s);
 
   // Insulators
   ctx.fillStyle = "#ddd";
-  for (let i = -1; i <= 1; i++) {
-    ctx.fillRect(x + i * 10 * s - 1.5 * s, y - poleH + 5 * s, 3 * s, 4 * s);
+  for (let i = -2; i <= 2; i++) {
+    ctx.fillRect(x + i * 8 * s - 1.5 * s, y - poleH + 6 * s, 3 * s, 5 * s);
   }
 
-  // Light wires (slight sag)
-  ctx.strokeStyle = "rgba(30,30,30,.6)";
+  // Wires sagging
+  ctx.strokeStyle = "rgba(20,20,20,.6)";
   ctx.lineWidth = Math.max(1, 1 * s);
-  ctx.beginPath();
-  ctx.moveTo(x - 14 * s, y - poleH + 9 * s);
-  ctx.quadraticCurveTo(x, y - poleH + 14 * s, x + 14 * s, y - poleH + 9 * s);
-  ctx.stroke();
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x + i * 8 * s, y - poleH + 8 * s);
+    ctx.quadraticCurveTo(x + i * 8 * s + 6 * s, y - poleH + 18 * s, x + i * 8 * s + 12 * s, y - poleH + 20 * s);
+    ctx.stroke();
+  }
+
+  // Transformer (occasional)
+  if (hasTransformer) {
+    ctx.fillStyle = "#a0a0a8";
+    ctx.fillRect(x - 6 * s, y - poleH + 30 * s, 12 * s, 10 * s);
+    ctx.fillStyle = "#555";
+    ctx.fillRect(x - 6 * s, y - poleH + 38 * s, 12 * s, 2 * s);
+  }
 }
 
-// Roadside sign: pole + rectangular sign.
+// Roadside sign: metal pole + colored signboard.
 function drawSign(x, y, s, side, color) {
-  const poleH = 30 * s;
-  const signW = 26 * s;
-  const signH = 12 * s;
+  const poleH = 34 * s;
+  const signW = 34 * s;
+  const signH = 16 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, 6 * s, 2.5 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 2 * s, 7 * s, 3 * s, 0, 0, TAU);
   ctx.fill();
 
   // Pole
   ctx.fillStyle = "#666";
-  ctx.fillRect(x - 1.5 * s, y - poleH, 3 * s, poleH);
+  ctx.fillRect(x - 2 * s, y - poleH, 4 * s, poleH);
 
-  // Sign board
+  // Sign board (big, colored)
   const colors = ["#2a6a3a", "#2a4a6a", "#8a2a2a", "#6a5a2a"];
   ctx.fillStyle = colors[Math.floor(color * colors.length) % colors.length];
   ctx.fillRect(x - signW / 2, y - poleH - signH, signW, signH);
 
-  // Sign border
+  // Border + simple glyph
   ctx.strokeStyle = "#fff4c7";
-  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.lineWidth = Math.max(1.5, 2 * s);
   ctx.strokeRect(x - signW / 2, y - poleH - signH, signW, signH);
+  ctx.fillStyle = "#fff4c7";
+  ctx.fillRect(x - 6 * s, y - poleH - signH * 0.6, 12 * s, 3 * s);
+  ctx.fillRect(x - 3 * s, y - poleH - signH * 0.3, 6 * s, 2 * s);
 }
 
-// Billboard: support poles + frame + flat panel (optional PNG texture).
+// Billboard: tall poles + thick frame + large panel (optional PNG).
 function drawBillboard(x, y, s, side, filename) {
-  const panelW = 90 * s;
-  const panelH = 40 * s;
-  const poleH = 30 * s;
+  const panelW = 110 * s;
+  const panelH = 60 * s;
+  const poleH = 40 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.14)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, panelW * 0.5, 6 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 2 * s, panelW * 0.5, 8 * s, 0, 0, TAU);
   ctx.fill();
 
-  // Support poles
-  ctx.fillStyle = "#555";
-  ctx.fillRect(x - panelW * 0.4 - 2 * s, y - poleH, 4 * s, poleH);
-  ctx.fillRect(x + panelW * 0.4 - 2 * s, y - poleH, 4 * s, poleH);
+  // Tall support poles
+  ctx.fillStyle = "#666";
+  ctx.fillRect(x - panelW * 0.42 - 3 * s, y - poleH, 7 * s, poleH);
+  ctx.fillRect(x + panelW * 0.42 - 4 * s, y - poleH, 7 * s, poleH);
 
-  // Frame
-  ctx.fillStyle = "#444";
-  ctx.fillRect(x - panelW / 2 - 3 * s, y - poleH - panelH - 3 * s, panelW + 6 * s, panelH + 6 * s);
+  // Thick frame
+  ctx.fillStyle = "#333";
+  ctx.fillRect(x - panelW / 2 - 5 * s, y - poleH - panelH - 5 * s, panelW + 10 * s, panelH + 10 * s);
 
-  // Panel
+  // Panel (empty or PNG)
   const img = getBillboardTexture(filename);
   if (img && img.complete && img.naturalWidth > 0) {
-    // Draw the PNG texture, preserving aspect ratio within the panel.
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const panelAspect = panelW / panelH;
     let dw = panelW;
     let dh = panelH;
-    if (imgAspect > panelAspect) {
-      dw = panelH * imgAspect;
-    } else {
-      dh = panelW / imgAspect;
-    }
+    if (imgAspect > panelAspect) dw = panelH * imgAspect;
+    else dh = panelW / imgAspect;
     const dx = x - dw / 2;
     const dy = y - poleH - panelH - (panelH - dh) / 2;
     ctx.drawImage(img, dx, dy, dw, dh);
   } else {
-    // Empty billboard: plain panel with a subtle border.
     ctx.fillStyle = "#e8e4d8";
     ctx.fillRect(x - panelW / 2, y - poleH - panelH, panelW, panelH);
     ctx.strokeStyle = "#999";
-    ctx.lineWidth = Math.max(1, 1.5 * s);
+    ctx.lineWidth = Math.max(1, 2 * s);
     ctx.strokeRect(x - panelW / 2, y - poleH - panelH, panelW, panelH);
   }
 }
 
-// Dhaba: larger roadside shop/building reusing shop components.
+// Dhaba: broad low building with veranda, columns, tables.
 function drawDhaba(x, y, s, side, color) {
-  const w = 80 * s;
-  const h = 46 * s;
+  const w = 100 * s;
+  const h = 55 * s;
   const palette = ["#c9a97a", "#b8a08a", "#d9c09b", "#a89070"];
   const body = palette[Math.floor(color * palette.length) % palette.length];
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.14)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 4 * s, w * 0.6, 8 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 4 * s, w * 0.6, 9 * s, 0, 0, TAU);
   ctx.fill();
 
-  // Body
+  // Building
   ctx.fillStyle = body;
   ctx.fillRect(x - w / 2, y - h, w, h);
 
   // Roof
   ctx.fillStyle = "#9a4f3f";
-  ctx.beginPath();
-  ctx.moveTo(x - w * 0.6, y - h);
-  ctx.lineTo(x, y - h - 16 * s);
-  ctx.lineTo(x + w * 0.6, y - h);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillRect(x - w / 2 - 5 * s, y - h - 8 * s, w + 10 * s, 9 * s);
 
-  // Awning
+  // Veranda columns
+  ctx.fillStyle = "#8a7a6a";
+  for (let i = -2; i <= 2; i++) {
+    ctx.fillRect(x + i * w * 0.24 - 2 * s, y - h + 8 * s, 4 * s, h - 8 * s);
+  }
+
+  // Large signboard
   ctx.fillStyle = "#c93632";
-  ctx.fillRect(x - w / 2, y - h + 6 * s, w, 7 * s);
+  ctx.fillRect(x - w * 0.4, y - h + 2 * s, w * 0.8, 10 * s);
   ctx.fillStyle = "#fff4c7";
   for (let i = 0; i < 8; i++) {
-    ctx.fillRect(x - w / 2 + i * (w / 8), y - h + 6 * s, w / 16, 7 * s);
+    ctx.fillRect(x - w * 0.3 + i * w * 0.08, y - h + 4 * s, w * 0.04, 6 * s);
   }
 
   // Door
   ctx.fillStyle = "#3a2a20";
-  ctx.fillRect(x - 8 * s, y - 20 * s, 16 * s, 20 * s);
+  ctx.fillRect(x - 10 * s, y - h + 12 * s, 20 * s, h - 12 * s);
+
+  // Tables under veranda
+  ctx.fillStyle = "#7a5a3a";
+  ctx.fillRect(x - w * 0.35, y - 12 * s, 22 * s, 4 * s);
+  ctx.fillRect(x + w * 0.1, y - 10 * s, 22 * s, 4 * s);
 
   // Windows
   ctx.fillStyle = "#86b8c7";
-  ctx.fillRect(x - w * 0.35, y - h + 14 * s, 12 * s, 10 * s);
-  ctx.fillRect(x + w * 0.23, y - h + 14 * s, 12 * s, 10 * s);
+  ctx.fillRect(x - w * 0.45, y - h + 18 * s, 8 * s, 8 * s);
+  ctx.fillRect(x + w * 0.4, y - h + 18 * s, 8 * s, 8 * s);
 }
 
-// Bus stop / shelter: roof, support poles, bench.
+// Bus stop: large shelter with roof, pillars, bench, sign.
 function drawBusStop(x, y, s, side) {
-  const w = 50 * s;
-  const roofH = 8 * s;
-  const poleH = 26 * s;
+  const w = 70 * s;
+  const roofH = 10 * s;
+  const poleH = 32 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, w * 0.5, 5 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 6 * s, 0, 0, TAU);
   ctx.fill();
 
-  // Support poles
+  // Support pillars (3)
   ctx.fillStyle = "#666";
-  ctx.fillRect(x - w / 2, y - poleH, 3 * s, poleH);
-  ctx.fillRect(x + w / 2 - 3 * s, y - poleH, 3 * s, poleH);
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillRect(x + i * w * 0.4 - 2.5 * s, y - poleH, 5 * s, poleH);
+  }
 
-  // Roof
+  // Roof slab
   ctx.fillStyle = "#2a6a3a";
-  ctx.fillRect(x - w / 2 - 3 * s, y - poleH - roofH, w + 6 * s, roofH);
+  ctx.fillRect(x - w / 2 - 5 * s, y - poleH - roofH, w + 10 * s, roofH);
 
   // Back panel
-  ctx.fillStyle = "rgba(200,200,200,.5)";
-  ctx.fillRect(x - w / 2, y - poleH + 6 * s, w, poleH - 6 * s);
+  ctx.fillStyle = "rgba(220,220,220,.5)";
+  ctx.fillRect(x - w / 2, y - poleH + 12 * s, w, poleH - 12 * s);
 
-  // Bench
+  // Bench (long)
   ctx.fillStyle = "#8a6a4a";
-  ctx.fillRect(x - 14 * s, y - 8 * s, 28 * s, 4 * s);
-  ctx.fillRect(x - 12 * s, y - 4 * s, 3 * s, 4 * s);
-  ctx.fillRect(x + 9 * s, y - 4 * s, 3 * s, 4 * s);
+  ctx.fillRect(x - 20 * s, y - 10 * s, 40 * s, 5 * s);
+  ctx.fillRect(x - 18 * s, y - 5 * s, 4 * s, 5 * s);
+  ctx.fillRect(x + 14 * s, y - 5 * s, 4 * s, 5 * s);
+
+  // Sign pole beside shelter
+  ctx.fillStyle = "#777";
+  ctx.fillRect(x + w * 0.6, y - poleH - 6 * s, 3 * s, poleH + 6 * s);
+  ctx.fillStyle = "#2a4a6a";
+  ctx.fillRect(x + w * 0.55, y - poleH - 16 * s, 18 * s, 10 * s);
 }
 
-// Petrol pump: stylized lightweight silhouette.
+// Petrol pump: wide canopy, 2-3 pumps, small building, tall sign.
 function drawPetrolPump(x, y, s, side, color) {
-  const w = 46 * s;
-  const h = 30 * s;
+  const w = 90 * s;
+  const h = 34 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.14)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 3 * s, w * 0.6, 6 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 3 * s, w * 0.6, 9 * s, 0, 0, TAU);
   ctx.fill();
 
-  // Canopy roof
+  // Big canopy roof
   ctx.fillStyle = "#c93632";
-  ctx.fillRect(x - w / 2 - 4 * s, y - h - 8 * s, w + 8 * s, 6 * s);
+  ctx.fillRect(x - w / 2 - 6 * s, y - h - 12 * s, w + 12 * s, 8 * s);
+  ctx.fillStyle = "#fff4c7";
+  ctx.fillRect(x - w / 2 - 6 * s, y - h - 4 * s, w + 12 * s, 2 * s);
 
   // Support columns
   ctx.fillStyle = "#777";
-  ctx.fillRect(x - w * 0.35, y - h - 2 * s, 4 * s, h + 2 * s);
-  ctx.fillRect(x + w * 0.35 - 4 * s, y - h - 2 * s, 4 * s, h + 2 * s);
+  ctx.fillRect(x - w * 0.35, y - h - 4 * s, 6 * s, h + 4 * s);
+  ctx.fillRect(x + w * 0.35 - 6 * s, y - h - 4 * s, 6 * s, h + 4 * s);
 
-  // Pump unit
+  // Pump units (2)
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillStyle = "#2a4a6a";
+    ctx.fillRect(x + i * 18 * s - 6 * s, y - h + 8 * s, 12 * s, h - 8 * s);
+    ctx.fillStyle = "#e8e4d8";
+    ctx.fillRect(x + i * 18 * s - 3 * s, y - h + 12 * s, 6 * s, 7 * s);
+  }
+
+  // Tall roadside sign
+  ctx.fillStyle = "#777";
+  ctx.fillRect(x + w * 0.55, y - h - 26 * s, 4 * s, 26 * s);
   ctx.fillStyle = "#2a4a6a";
-  ctx.fillRect(x - 8 * s, y - h + 4 * s, 16 * s, h - 4 * s);
+  ctx.fillRect(x + w * 0.5, y - h - 36 * s, 18 * s, 10 * s);
 
-  // Pump display
-  ctx.fillStyle = "#e8e4d8";
-  ctx.fillRect(x - 5 * s, y - h + 8 * s, 10 * s, 6 * s);
+  // Price-display panel
+  ctx.fillStyle = "#222";
+  ctx.fillRect(x - 8 * s, y - 14 * s, 16 * s, 5 * s);
+  ctx.fillStyle = "#c8d83a";
+  ctx.fillRect(x - 6 * s, y - 13 * s, 12 * s, 3 * s);
 }
 
-// Roadside cart: small wheeled cart.
+// Cart: small wheeled cart.
 function drawCart(x, y, s, side, color) {
-  const w = 30 * s;
-  const h = 20 * s;
+  const w = 34 * s;
+  const h = 22 * s;
 
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, w * 0.5, 4 * s, 0, 0, TAU);
+  ctx.ellipse(x, y + 2 * s, w * 0.55, 4 * s, 0, 0, TAU);
   ctx.fill();
 
   // Cart body
   ctx.fillStyle = "#8a6a4a";
   ctx.fillRect(x - w / 2, y - h, w, h);
 
-  // Goods on top
+  // Goods
   ctx.fillStyle = "#c9a97a";
   ctx.fillRect(x - w / 2 + 2 * s, y - h - 6 * s, w - 4 * s, 6 * s);
 
   // Wheels
   ctx.fillStyle = "#333";
   ctx.beginPath();
-  ctx.arc(x - w * 0.3, y - 3 * s, 4 * s, 0, TAU);
+  ctx.arc(x - w * 0.32, y - 2 * s, 4.5 * s, 0, TAU);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(x + w * 0.3, y - 3 * s, 4 * s, 0, TAU);
+  ctx.arc(x + w * 0.32, y - 2 * s, 4.5 * s, 0, TAU);
   ctx.fill();
 }
 

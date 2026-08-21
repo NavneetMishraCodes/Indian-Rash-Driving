@@ -36,8 +36,8 @@ const BILLBOARD_BASE =
     : "public/assets/billboards/";
 
 const BILLBOARD_IMAGES = [
-  // Add PNG filenames here, e.g. "billboard-01.png".
-  // Files go in: public/assets/billboards/
+  "hakla.PNG",
+  "vimal_all_three.PNG"
 ];
 
 // Billboard texture cache: each image is loaded once and reused across

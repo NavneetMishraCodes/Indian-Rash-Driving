@@ -36,8 +36,14 @@ const BILLBOARD_BASE =
     : "public/assets/billboards/";
 
 const BILLBOARD_IMAGES = [
+  "aksh_kmr.PNG",
+  "arpit_bala_1.PNG",
+  "arpit_bala_2.PNG",
   "hakla.PNG",
-  "vimal_all_three.PNG"
+  "ladki1.PNG",
+  "udhar_dekh.PNG",
+  "vimal_all_three.PNG",
+  "vo_pakistani.PNG"
 ];
 
 // Billboard texture cache: each image is loaded once and reused across
@@ -347,7 +353,7 @@ let sectionIndex = 0;
 // small clutter stays near 1. This is what makes the roadside read clearly
 // at driving speed.
 const PROP_SIZES = {
-  billboard: 2.0,
+  billboard: 2.25,
   hoarding: 1.7,
   dhaba: 1.8,
   petrolPump: 1.7,
@@ -384,6 +390,14 @@ function pickSceneryKind() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function getSceneryOffset(kind) {
+  if (kind === "billboard") {
+    return rand(2.55, 3.25);
+  }
+
+  return rand(1.45, 2.45);
+}
+
 function makeScenery() {
   scenery.length = 0;
   sectionIndex = 0;
@@ -402,7 +416,7 @@ function makeScenery() {
     scenery.push({
       side: clusterSide,
       depth: Math.random(),
-      offset: rand(1.45, 2.45),
+      offset: getSceneryOffset(kind),
       kind,
       size: PROP_SIZES[kind] || 1,
       phase: Math.random() * TAU,
@@ -570,12 +584,13 @@ function update(dt) {
 
       obj.side = Math.random() < 0.5 ? -1 : 1;
 
-      // Keep every object safely away from the road.
-      obj.offset = rand(1.45, 2.45);
-
       // Re-pick from the section compositions.
       obj.kind = pickSceneryKind();
       obj.size = PROP_SIZES[obj.kind] || 1;
+      
+      // Apply billboard-specific offset for recycled objects.
+      obj.offset = getSceneryOffset(obj.kind);
+      
       obj.phase = Math.random() * TAU;
       obj.variant = Math.floor(Math.random() * 4);
       obj.color = Math.random();

@@ -1,6 +1,13 @@
 import { PlayerCar } from "./entities/PlayerCar.js";
 import { TrafficSystem } from "./systems/TrafficSystem.js";
 import { ScoringSystem } from "./systems/ScoringSystem.js";
+import { assetManager } from "./systems/AssetManager.js";
+import { audioManager } from "./systems/AudioManager.js";
+import { billboardSystem } from "./systems/BillboardSystem.js";
+import {
+  COLLISION_SOUND_FILES,
+  BILLBOARD_IMAGE_FILES
+} from "./asset-lists.js";
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false });
@@ -35,87 +42,35 @@ const BILLBOARD_BASE =
     ? `${import.meta.env.BASE_URL}assets/billboards/`
     : "public/assets/billboards/";
 
-const BILLBOARD_IMAGES = [
-  "aksh_kmr.PNG",
-  "arpit_bala_1.PNG",
-  "arpit_bala_2.PNG",
-  "hakla.PNG",
-  "ladki1.PNG",
-  "udhar_dekh.PNG",
-  "vimal_all_three.PNG",
-  "vo_pakistani.PNG"
-];
+const BILLBOARD_IMAGES = BILLBOARD_IMAGE_FILES;
 
-// Billboard texture cache: each image is loaded once and reused across
-// all billboards that reference it. Never reloaded per frame.
-const billboardTextureCache = new Map();
+// Billboard textures go through the shared AssetManager so every
+// billboard reuses the same image instance — never reloaded per frame.
+billboardSystem.setBase(BILLBOARD_BASE);
 
-function getBillboardTexture(filename) {
-  if (!filename) return null;
+// Full list of currently-present collision files. Built by mapping the
+// auto-generated `COLLISION_SOUND_FILES` filenames (read from the actual
+// filesystem) onto the AUDIO_BASE prefix.
+const COLLISION_SOUNDS = COLLISION_SOUND_FILES.map(
+  (file) => `${AUDIO_BASE}${file}`
+);
 
-  if (billboardTextureCache.has(filename)) {
-    return billboardTextureCache.get(filename);
-  }
-
-  const img = new Image();
-  img.src = `${BILLBOARD_BASE}${filename}`;
-  billboardTextureCache.set(filename, img);
-  return img;
-}
-
-const COLLISION_SOUNDS = [
-  `${AUDIO_BASE}atmkbfjg-echo.mp3`,
-  `${AUDIO_BASE}chicken-on-tree-screaming.mp3`,
-  `${AUDIO_BASE}cid.mp3`,
-  `${AUDIO_BASE}cid-acp-behn-choo.mp3`,
-  `${AUDIO_BASE}cid-chut.mp3`,
-  `${AUDIO_BASE}cid-le-mdc.mp3`,
-  `${AUDIO_BASE}cid-tum-bl-k-f.mp3`,
-  `${AUDIO_BASE}contesta-punetas.mp3`,
-  `${AUDIO_BASE}dil-na-diya.mp3`,
-  `${AUDIO_BASE}fe-n-travis-scott.mp3`,
-  `${AUDIO_BASE}f-you-baltimore.mp3`,
-  `${AUDIO_BASE}gta-san-andreas-ah-shit-here-we-go-again.mp3`,
-  `${AUDIO_BASE}hello-moto-estourado.mp3`,
-  `${AUDIO_BASE}i-sh-t-my-pants-aldi.mp3`,
-  `${AUDIO_BASE}kyu-re-madarchod-cid.mp3`,
-  `${AUDIO_BASE}miguel-miguel_BwNUGvA.mp3`,
-  `${AUDIO_BASE}mr-beast-phonk-meme-mp3.mp3`,
-  `${AUDIO_BASE}naam-ya-daam-naam-ravi-kishan.mp3`,
-  `${AUDIO_BASE}nahi-nahi-salec-yaha-kuchh-to-gadbad-hai.mp3`,
-  `${AUDIO_BASE}oi-oi-oe-oi-a-eye-eye.mp3`,
-  `${AUDIO_BASE}phir-teri-maiya-chodta-hu-cid.mp3`,
-  `${AUDIO_BASE}really-nig.mp3`,
-  `${AUDIO_BASE}tralalero-funk.mp3`,
-  `${AUDIO_BASE}what-the-hell-omg-no-wayyyyy.mp3`,
-  `${AUDIO_BASE}yes-yes-yes-kibidi.mp3`,
-];
-
-let currentCollisionAudio = null;
-
+// Collision sounds play through the AudioManager's exclusive channel,
+// which stops the previous collision sound before playing the new one
+// (only one collision sound is audible at a time) and handles browser
+// autoplay unlock on the first user interaction.
 function playRandomCollisionSound() {
   if (!COLLISION_SOUNDS.length) return;
-
-  if (currentCollisionAudio) {
-    currentCollisionAudio.pause();
-    currentCollisionAudio.currentTime = 0;
-  }
 
   const path =
     COLLISION_SOUNDS[
       Math.floor(Math.random() * COLLISION_SOUNDS.length)
     ];
 
-  const audio = new Audio(path);
-
-  audio.volume = 1;
-  audio.loop = false;
-
-  currentCollisionAudio = audio;
-
-  audio.play().catch(error => {
-    console.error("Collision sound failed:", error);
-  });
+  // Use the exclusive playback channel. If a previous collision sound
+  // is still playing, it is stopped immediately and only the newest
+  // collision sound is heard (no overlap, one active collision sound).
+  audioManager.playExclusive(path, 1);
 }
 
 const TAU = Math.PI * 2;
@@ -349,39 +304,101 @@ const ROADSIDE_SECTIONS = [
 
 let sectionIndex = 0;
 
-// Per-object visual scale multiplier. Large highway props get a big boost,
-// small clutter stays near 1. This is what makes the roadside read clearly
-// at driving speed.
+// ------------------------------------------------------------
+// CONSISTENT WORLD-SPACE CATEGORY SCALE
+//
+// Each prop's draw function has its own intrinsic proportions. To
+// make the roadside read as a coherent world, every category gets a
+// scale factor that maps its draw units into a shared world scale
+// (relative to the ~100px car body):
+//
+//   * Small roadside clutter  ~1.0x  (carts, bikes, stalls)
+//   * Houses / shops          ~0.85–1.0x
+//   * Large buildings/emblems  ~1.0–1.4x (dhaba, bus stop, petrol)
+//   * Tall objects (poles/trees) ~1.2–1.4x (height-biased)
+//   * Billboards handled by BillboardSystem (kept small here)
+//
+// The important outcome is *relative* consistency — a shop is never
+// bigger than a dhaba, a house is never smaller than a cart, and a
+// billboard stays big enough to notice but small enough to believe.
+// ------------------------------------------------------------
 const PROP_SIZES = {
-  billboard: 2.25,
-  hoarding: 1.7,
-  dhaba: 1.8,
-  petrolPump: 1.7,
-  busStop: 1.45,
-  utilityPole: 1.55,
-  repair: 1.35,
-  service: 1.35,
-  shop: 1.3,
-  kiosk: 1.3,
-  waterKiosk: 1.25,
-  house: 1.2,
-  truck: 1.35,
-  auto: 1.05,
-  motorcycle: 1.0,
-  cart: 1.15,
-  fruit: 1.15,
-  chaiStall: 1.2,
-  foodStall: 1.15,
-  haat: 1.3,
-  bigTree: 1.55,
-  tree: 1.15,
-  temple: 1.25,
-  sign: 1.25,
-  wall: 1.15,
-  clutter: 1.0,
-  barrels: 1.0,
-  drain: 1.0,
+  billboard: 1.1,     // frame sized inside BillboardSystem
+  hoarding: 0.9,
+  dhaba: 1.0,
+  petrolPump: 1.0,
+  busStop: 1.3,
+  utilityPole: 1.4,
+  repair: 1.0,
+  service: 1.0,
+  shop: 0.85,
+  kiosk: 1.0,
+  waterKiosk: 1.0,
+  house: 1.0,
+  truck: 1.3,
+  auto: 1.0,
+  motorcycle: 0.9,
+  cart: 1.0,
+  fruit: 1.0,
+  chaiStall: 1.0,
+  foodStall: 1.0,
+  haat: 1.2,
+  bigTree: 1.2,
+  tree: 0.85,
+  temple: 1.1,
+  sign: 1.1,
+  wall: 1.0,
+  clutter: 0.85,
+  barrels: 0.85,
+  drain: 0.85,
   open: 1.0
+};
+
+// ------------------------------------------------------------
+// PER-CATEGORY ROADSIDE PLACEMENT BANDS
+//
+// Distance from the road centre line, in road half-widths (1.0 = road
+// edge / shoulder, ~6 m). Small clutter hugs the shoulder; shops and
+// kiosks sit just outside it; large buildings and billboards stand
+// farther back so they never loom over the lane or overlap the road.
+//
+// These bands give every prop an intentional relationship with the
+// road instead of one shared random band.
+// ------------------------------------------------------------
+const PROP_PLACEMENT = {
+  // Billboards now render significantly larger (300–380 scene units),
+  // so they are pushed farther back than any other prop — far enough
+  // that the bigger board never reaches toward the road or overlaps
+  // the player's lane.
+  billboard:   [2.8, 3.6],
+  hoarding:    [1.9, 2.7],
+  petrolPump:  [1.7, 2.5],
+  busStop:     [1.7, 2.5],
+  dhaba:       [1.7, 2.5],
+  repair:      [1.5, 2.2],
+  service:     [1.5, 2.2],
+  shop:        [1.5, 2.1],
+  kiosk:       [1.35, 1.8],
+  waterKiosk:  [1.4, 1.9],
+  haat:        [1.5, 2.1],
+  fruit:       [1.3, 1.75],
+  chaiStall:   [1.4, 1.95],
+  foodStall:   [1.4, 1.95],
+  temple:      [1.6, 2.2],
+  wall:        [1.3, 1.8],
+  bigTree:     [1.5, 2.2],
+  tree:        [1.4, 2.0],
+  bush:        [1.3, 1.75],
+  truck:       [1.5, 2.4],
+  auto:        [1.3, 1.8],
+  motorcycle:  [1.25, 1.7],
+  cart:        [1.3, 1.8],
+  sign:        [1.15, 1.5],
+  utilityPole: [1.15, 1.5],
+  clutter:     [1.2, 1.65],
+  barrels:     [1.3, 1.8],
+  drain:       [1.1, 1.5],
+  open:        [1.2, 1.8]
 };
 
 function pickSceneryKind() {
@@ -391,11 +408,8 @@ function pickSceneryKind() {
 }
 
 function getSceneryOffset(kind) {
-  if (kind === "billboard") {
-    return rand(2.55, 3.25);
-  }
-
-  return rand(1.45, 2.45);
+  const band = PROP_PLACEMENT[kind];
+  return band ? rand(band[0], band[1]) : rand(1.45, 2.05);
 }
 
 function makeScenery() {
@@ -437,6 +451,41 @@ function makeScenery() {
 }
 
 makeScenery();
+
+// ============================================================
+// PRELOAD IMPORTANT ASSETS (non-blocking)
+// ------------------------------------------------------------
+// The game loop starts immediately; these fetches happen in the
+// background through the shared AssetManager cache so that:
+//   * billboard textures are decoded before the first billboard scrolls
+//     into view (high priority — they pop into frame often),
+//   * collision sound files are buffered before a collision happens
+//     (high priority — the first hit must not stall waiting on audio),
+//   * no audio/image is ever fetched twice (the cache dedupes).
+// All preloads settle in the background; failures are ignored so a
+// missing file can never block the game.
+// ============================================================
+function preloadCriticalAssets() {
+  // High priority: billboard textures (needed immediately on screen).
+  billboardSystem.preload(BILLBOARD_IMAGES);
+
+  // High priority: collision sounds — must be ready before contact.
+  // audioManager.preload returns a Promise that uses canplaythrough,
+  // which is the correct "ready to play" signal. We intentionally do
+  // NOT await it: the game should remain responsive immediately.
+  //
+  // The batched preloader keeps at most a few audio fetches in flight
+  // at once so the full set of collision sounds (currently 34 MP3s on
+  // disk) doesn't monopolise the browser's connection pool and delay
+  // the billboard textures above.
+  assetManager.preloadBatched(
+    (url) => audioManager.preload([url]),
+    COLLISION_SOUNDS,
+    3
+  );
+}
+
+preloadCriticalAssets();
 
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
@@ -887,9 +936,8 @@ function drawScenery(w, h) {
     const x = w * (0.5 + obj.side * p.width * obj.offset);
     const y = h * p.y;
 
-    // Base perspective scale, then a per-prop size multiplier so big
-    // highway props (billboards, dhabas, petrol pumps, poles) read much
-    // larger than small clutter on screen.
+    // Base perspective scale, then a per-prop category multiplier so
+    // the whole roadside shares a coherent world scale (see PROP_SIZES).
     const scale = lerp(
       0.18,
       1.15,
@@ -968,7 +1016,7 @@ function drawScenery(w, h) {
         drawSign(x, y, scale, obj.side, obj.color);
         break;
       case "billboard":
-        drawBillboard(x, y, scale, obj.side, obj.billboard);
+        billboardSystem.draw(ctx, x, y, scale, obj.side, obj.billboard);
         break;
       case "dhaba":
         drawDhaba(x, y, scale, obj.side, obj.color);
@@ -1861,48 +1909,6 @@ function drawSign(x, y, s, side, color) {
   ctx.fillStyle = "#fff4c7";
   ctx.fillRect(x - 6 * s, y - poleH - signH * 0.6, 12 * s, 3 * s);
   ctx.fillRect(x - 3 * s, y - poleH - signH * 0.3, 6 * s, 2 * s);
-}
-
-// Billboard: tall poles + thick frame + large panel (optional PNG).
-function drawBillboard(x, y, s, side, filename) {
-  const panelW = 110 * s;
-  const panelH = 60 * s;
-  const poleH = 40 * s;
-
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,.14)";
-  ctx.beginPath();
-  ctx.ellipse(x, y + 2 * s, panelW * 0.5, 8 * s, 0, 0, TAU);
-  ctx.fill();
-
-  // Tall support poles
-  ctx.fillStyle = "#666";
-  ctx.fillRect(x - panelW * 0.42 - 3 * s, y - poleH, 7 * s, poleH);
-  ctx.fillRect(x + panelW * 0.42 - 4 * s, y - poleH, 7 * s, poleH);
-
-  // Thick frame
-  ctx.fillStyle = "#333";
-  ctx.fillRect(x - panelW / 2 - 5 * s, y - poleH - panelH - 5 * s, panelW + 10 * s, panelH + 10 * s);
-
-  // Panel (empty or PNG)
-  const img = getBillboardTexture(filename);
-  if (img && img.complete && img.naturalWidth > 0) {
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    const panelAspect = panelW / panelH;
-    let dw = panelW;
-    let dh = panelH;
-    if (imgAspect > panelAspect) dw = panelH * imgAspect;
-    else dh = panelW / imgAspect;
-    const dx = x - dw / 2;
-    const dy = y - poleH - panelH - (panelH - dh) / 2;
-    ctx.drawImage(img, dx, dy, dw, dh);
-  } else {
-    ctx.fillStyle = "#e8e4d8";
-    ctx.fillRect(x - panelW / 2, y - poleH - panelH, panelW, panelH);
-    ctx.strokeStyle = "#999";
-    ctx.lineWidth = Math.max(1, 2 * s);
-    ctx.strokeRect(x - panelW / 2, y - poleH - panelH, panelW, panelH);
-  }
 }
 
 // Dhaba: broad low building with veranda, columns, tables.

@@ -323,34 +323,46 @@ let sectionIndex = 0;
 // billboard stays big enough to notice but small enough to believe.
 // ------------------------------------------------------------
 const PROP_SIZES = {
-  billboard: 1.1,     // frame sized inside BillboardSystem
+  // DO NOT TOUCH BILLBOARDS
+  billboard: 1.1,
   hoarding: 0.9,
-  dhaba: 1.0,
-  petrolPump: 1.0,
-  busStop: 1.3,
-  utilityPole: 1.4,
-  repair: 1.0,
-  service: 1.0,
-  shop: 0.85,
-  kiosk: 1.0,
-  waterKiosk: 1.0,
-  house: 1.0,
-  truck: 1.3,
-  auto: 1.0,
-  motorcycle: 0.9,
-  cart: 1.0,
-  fruit: 1.0,
-  chaiStall: 1.0,
-  foodStall: 1.0,
-  haat: 1.2,
-  bigTree: 1.2,
-  tree: 0.85,
-  temple: 1.1,
-  sign: 1.1,
-  wall: 1.0,
-  clutter: 0.85,
-  barrels: 0.85,
-  drain: 0.85,
+
+  // Major roadside structures
+  dhaba: 1.25,
+  petrolPump: 1.25,
+  busStop: 1.45,
+  repair: 1.2,
+  service: 1.2,
+  shop: 1.15,
+  kiosk: 1.15,
+  waterKiosk: 1.15,
+  house: 1.2,
+  temple: 1.3,
+
+  // Vehicles / roadside objects
+  truck: 1.35,
+  auto: 1.1,
+  motorcycle: 1.0,
+  cart: 1.1,
+  fruit: 1.1,
+  chaiStall: 1.15,
+  foodStall: 1.15,
+  haat: 1.3,
+
+  // Vegetation
+  bigTree: 1.4,
+  tree: 1.05,
+  bush: 1.0,
+
+  // Infrastructure
+  utilityPole: 1.5,
+  sign: 1.2,
+  wall: 1.1,
+  clutter: 1.0,
+  barrels: 1.0,
+  drain: 1.0,
+
+  // Empty/open scenery
   open: 1.0
 };
 
